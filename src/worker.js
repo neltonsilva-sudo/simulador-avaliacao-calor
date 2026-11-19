@@ -532,6 +532,13 @@ export async function buildWorker(stage, app) {
     const piv = holderOn(B.Pelvis); piv.position.copy(relTo(B.Pelvis, fbx.worldToLocal(hipC.clone()).toArray())); apron.skirtPivot = piv; piv.userData.q0 = piv.quaternion.clone();
     const sk = new THREE.Mesh(sheet(54, 102, 20, 24, (u, s, t) => hipZ + 2.6 + 1.2 * t - 7 * s * s + 0.5 * Math.sin(s * 9 + t * 3) * t), am); sk.castShadow = sk.receiveShadow = true;
     fbx.add(sk); sk.updateMatrixWorld(true); piv.attach(sk); apron.parts.push(sk);
+    // dobra no joelho: a saia gira com a coxa (pivô), mas a parte abaixo do joelho volta a cair na vertical quando ela senta
+    // (antes ficava uma "tábua" reta sobre o colo). Deformação por vértice no espaço local da saia, só quando muda.
+    { const hipY = fbx.worldToLocal(hipC.clone()).y;
+      apron.sk = sk; apron.base = sk.geometry.attributes.position.array.slice(); apron.lastK = -1;
+      apron.axis = V3(1, 0, 0).applyQuaternion(sk.quaternion.clone().invert()).normalize();
+      apron.fold = V3(0, hipY + 7, hipZ + 1.5);        // dobra da cintura: o tecido deita sobre o topo das coxas
+      apron.fold2 = V3(0, hipY + 7 - 38, hipZ + 1.5); } // dobra do joelho: a barra volta a cair
     // alça do pescoço e cordão da cintura com laço nas costas
     const zN = zf(136) + 2.4;
     const strapP = [[10.5, 136.5, zN - 0.6], [8.6, 143, zN - 2.2], [6.8, 148, -2.5], [3.5, 150.2, -7.5], [0, 150.6, -9.0], [-3.5, 150.2, -7.5], [-6.8, 148, -2.5], [-8.6, 143, zN - 2.2], [-10.5, 136.5, zN - 0.6]].map((p) => V3(...p));
@@ -741,7 +748,25 @@ export async function buildWorker(stage, app) {
       rotW(B[sd + '_Foot'], side, (th - knee) - 0.12 * ww * Math.max(0, Math.cos(p)) * (1 - sw));
       maxTh = Math.max(maxTh, th);
     }
-    if (apron.skirtPivot) apron.skirtPivot.quaternion.copy(apron.skirtPivot.userData.q0).multiply(_q.setFromAxisAngle(V3(1, 0, 0), -Math.min(1.35, Math.max(0, maxTh) * 0.9)));
+    if (apron.skirtPivot) {
+      const thp = -Math.min(1.35, Math.max(0, maxTh) * 0.9);
+      // em pé/andando a saia inteira balança com a coxa (pivô); sentada, a curvatura passa para o tecido (vértices)
+      apron.skirtPivot.quaternion.copy(apron.skirtPivot.userData.q0).multiply(_q.setFromAxisAngle(V3(1, 0, 0), thp * (1 - sw)));
+      const kS = Math.round(sw * 40) / 40;
+      if (apron.sk && kS !== apron.lastK) {
+        apron.lastK = kS; const th = -1.42 * kS, b = apron.base, pa = apron.sk.geometry.attributes.position, f = apron.fold, f2 = apron.fold2, v = V3(0, 0, 0), q = new THREE.Quaternion();
+        for (let i = 0; i < pa.count; i++) {
+          v.set(b[i * 3], b[i * 3 + 1], b[i * 3 + 2]);
+          if (kS > 0 && v.y < f.y) {
+            v.x *= 1 - 0.18 * kS * Math.min(1, (f.y - v.y) / 30); // estreita sobre as pernas juntas
+            if (v.y < f2.y) { const k2 = Math.min(1, (f2.y - v.y) / 4); v.sub(f2).applyQuaternion(q.setFromAxisAngle(apron.axis, -th * 0.92 * k2)).add(f2); }
+            const k1 = Math.min(1, (f.y - v.y) / 4); v.sub(f).applyQuaternion(q.setFromAxisAngle(apron.axis, th * k1)).add(f);
+          }
+          pa.setXYZ(i, v.x, v.y, v.z);
+        }
+        pa.needsUpdate = true; apron.sk.geometry.computeVertexNormals(); apron.sk.geometry.computeBoundingSphere();
+      }
+    }
     // cabeça (antes dos braços: clavículas são filhas do pescoço)
     smV(S.look, P.look, 3.5, dt);
     { // Giro natural: o tronco (Spine1/Spine2) absorve o excesso acima de ~35°, o pescoço só um pouco (as clavículas são
