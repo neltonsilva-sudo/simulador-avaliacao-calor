@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Avaliação de Calor (IBUTG) — Simulador</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@600;700&family=Roboto+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="src/ui.css?v=1b7ed2be">
+<style>
+  :root { --bg:#0b0d10; --fg:#e8eaed; }
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--fg); font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; outline:none; }
+  #ui { position:fixed; inset:0; pointer-events:none; }
+  #ui > * { pointer-events:auto; }
+  #boot { position:fixed; inset:0; z-index:100; display:grid; place-items:center; transition:opacity .6s; cursor:progress;
+    background: radial-gradient(1200px 700px at 50% 38%, #2e1408 0%, #140c09 45%, #08090b 100%); }
+  #boot .bx { width:min(420px, 84vw); text-align:center; }
+  #boot .ey { font:700 11px system-ui; letter-spacing:.2em; color:#ff8a4c; text-transform:uppercase; }
+  #boot h1 { margin:.45em 0 .2em; font:800 clamp(26px,5vw,38px)/1.1 system-ui; letter-spacing:-.01em; color:#f3efe9; }
+  #boot p { margin:0 0 26px; font:500 14px/1.4 system-ui; color:#a59d94; }
+  #boot .bar { height:6px; border-radius:6px; background:rgba(255,255,255,.08); overflow:hidden; }
+  #boot .bar i { display:block; height:100%; width:4%; border-radius:6px; background:linear-gradient(90deg,#e8551c,#ffb36b); box-shadow:0 0 12px rgba(232,85,28,.6); }
+  #boot .st { margin-top:12px; font:600 11px system-ui; letter-spacing:.14em; color:#7d766f; text-transform:uppercase; }
+</style>
+<script type="importmap">
+{
+ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "./src/audio.js": "./src/audio.js?v=97fb75d7",
+  "./src/cald.js": "./src/cald.js?v=dbdeff34",
+  "./src/cald_build.js": "./src/cald_build.js?v=905645a2",
+  "./src/cald_equip.js": "./src/cald_equip.js?v=1b7c95a9",
+  "./src/cald_geo.js": "./src/cald_geo.js?v=4c6a43b4",
+  "./src/cald_props.js": "./src/cald_props.js?v=e4ebd398",
+  "./src/cald_steam.js": "./src/cald_steam.js?v=3823c698",
+  "./src/cald_tex.js": "./src/cald_tex.js?v=8323b111",
+  "./src/cycle.js": "./src/cycle.js?v=df6d4f0f",
+  "./src/demo.js": "./src/demo.js?v=11868ab6",
+  "./src/firmware.js": "./src/firmware.js?v=dc30360d",
+  "./src/fw_core.js": "./src/fw_core.js?v=6cf1fdc2",
+  "./src/hall.js": "./src/hall.js?v=888947ab",
+  "./src/hall_tex.js": "./src/hall_tex.js?v=33a5ed6b",
+  "./src/ibutg.js": "./src/ibutg.js?v=5367dbb4",
+  "./src/ibutg_tables.js": "./src/ibutg_tables.js?v=ff4d6dfd",
+  "./src/layout.js": "./src/layout.js?v=c8b1b04b",
+  "./src/layout_caldeiras.js": "./src/layout_caldeiras.js?v=4a8b1767",
+  "./src/layout_cams.js": "./src/layout_cams.js?v=f17d7279",
+  "./src/lcd.js": "./src/lcd.js?v=8abcbc56",
+  "./src/mach_geo.js": "./src/mach_geo.js?v=12c3ece1",
+  "./src/mach_ovens.js": "./src/mach_ovens.js?v=7eb99f7c",
+  "./src/mach_props.js": "./src/mach_props.js?v=db7b9c72",
+  "./src/mach_tex.js": "./src/mach_tex.js?v=e3427cb8",
+  "./src/machines.js": "./src/machines.js?v=af0e3290",
+  "./src/main.js": "./src/main.js?v=e018eac7",
+  "./src/meter.js": "./src/meter.js?v=7a78b9a1",
+  "./src/meter_geo.js": "./src/meter_geo.js?v=88bb253c",
+  "./src/meter_kit.js": "./src/meter_kit.js?v=8a43b9b3",
+  "./src/meter_tex.js": "./src/meter_tex.js?v=fa77c6bb",
+  "./src/meter_tripod.js": "./src/meter_tripod.js?v=8192a5de",
+  "./src/props.js": "./src/props.js?v=5ae7d5b5",
+  "./src/props_geo.js": "./src/props_geo.js?v=0500efe6",
+  "./src/props_tex.js": "./src/props_tex.js?v=d467b9bd",
+  "./src/scene.js": "./src/scene.js?v=935e1ef9",
+  "./src/scene_post.js": "./src/scene_post.js?v=73a46ef4",
+  "./src/thermal.js": "./src/thermal.js?v=f48e2ed4",
+  "./src/ui.js": "./src/ui.js?v=5b0da7e1",
+  "./src/ui_eval.js": "./src/ui_eval.js?v=7c91bb0e",
+  "./src/ui_measure.js": "./src/ui_measure.js?v=e16da750",
+  "./src/ui_voice.js": "./src/ui_voice.js?v=358e56dd",
+  "./src/worker.js": "./src/worker.js?v=0a766e6e",
+  "./src/worker_boots.js": "./src/worker_boots.js?v=7f6b3504",
+  "./src/worker_head.js": "./src/worker_head.js?v=056abdc5",
+  "./src/worker_head_hair.js": "./src/worker_head_hair.js?v=621d01e6",
+  "./src/worker_head_tex.js": "./src/worker_head_tex.js?v=acc85752",
+  "./src/worker_shirt.js": "./src/worker_shirt.js?v=4ea0280e",
+  "./src/worker_uniform.js": "./src/worker_uniform.js?v=5fd34e7b"
+ }
+}
+</script>
+</head>
+<body>
+<canvas id="c" tabindex="0"></canvas>
+<div id="ui"></div>
+<div id="boot"><div class="bx"><div class="ey">NHO-06 · NR-15 Anexo 3</div><h1>Avaliação de Calor</h1><p>Setor de fornos, medidor de IBUTG e forneira</p><div class="bar"><i id="bootbar"></i></div><div class="st" id="bootst">Carregando o simulador…</div></div></div>
+<script type="module">import './src/main.js';</script>
+</body>
+</html>
