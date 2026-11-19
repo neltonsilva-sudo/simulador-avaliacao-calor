@@ -536,7 +536,12 @@ export async function buildWorker(stage, app) {
     const zN = zf(136) + 2.4;
     const strapP = [[10.5, 136.5, zN - 0.6], [8.6, 143, zN - 2.2], [6.8, 148, -2.5], [3.5, 150.2, -7.5], [0, 150.6, -9.0], [-3.5, 150.2, -7.5], [-6.8, 148, -2.5], [-8.6, 143, zN - 2.2], [-10.5, 136.5, zN - 0.6]].map((p) => V3(...p));
     toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(strapP), 48, 0.75, 6), B.Spine2);
-    const yW = 101.5, zc = (zf(yW) + 2.8 + back[101] - 3.0) / 2, zr = (zf(yW) + 2.8 - (back[101] - 3.0)) / 2, xr = (half[101] || 16) + 3.0;
+    // cintura: frente/costas/largura medidas na malha; se a medida das costas falhar (valor sentinela 99) o anel virava um
+    // laço gigante fora do corpo — usa profundidade típica (~20 cm) e largura limitada a 12–17 cm de meia-largura.
+    const yW = 101.5, zFr = zf(yW) + 1.6;
+    let zBk = Math.min(back[100], back[101], back[102], back[103]) - 1.2;
+    if (!(zBk < zFr - 10 && zFr - zBk < 32)) zBk = zFr - 21;
+    const zc = (zFr + zBk) / 2, zr = (zFr - zBk) / 2, xr = Math.min(17, Math.max(12, half[101] || half[100] || 15)) + 1.4;
     const cord = []; for (let k = 0; k <= 64; k++) { const a = k / 64 * Math.PI * 2; cord.push(V3(Math.sin(a) * xr, yW, zc + Math.cos(a) * zr)); }
     toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cord, true), 96, 0.8, 6, true), B.Spine);
     const bz = zc - zr - 0.8;
@@ -739,12 +744,23 @@ export async function buildWorker(stage, app) {
     if (apron.skirtPivot) apron.skirtPivot.quaternion.copy(apron.skirtPivot.userData.q0).multiply(_q.setFromAxisAngle(V3(1, 0, 0), -Math.min(1.35, Math.max(0, maxTh) * 0.9)));
     // cabeça (antes dos braços: clavículas são filhas do pescoço)
     smV(S.look, P.look, 3.5, dt);
-    { const look = S.look.clone(), hp0 = wpos(B.Head).add(V3(0, 0.09, 0)), dv = look.clone().sub(hp0), hz = Math.hypot(dv.x, dv.z), mx = hz * Math.tan(P.drink > 0.3 ? 0.6 : 0.5);
-      if (dv.y > mx) look.y = hp0.y + mx;
+    { // Giro natural: o tronco (Spine1/Spine2) absorve o excesso acima de ~35°, o pescoço só um pouco (as clavículas são
+      // filhas do pescoço — girá-lo muito deforma os ombros) e a cabeça no máximo ~45° em relação ao peito; alvo muito atrás
+      // (> ~110°) é ignorado e ela olha para a frente, em vez de torcer o pescoço.
+      const look = S.look.clone(); let hp0 = wpos(B.Head).add(V3(0, 0.09, 0)); let dv = look.clone().sub(hp0); const hz = Math.hypot(dv.x, dv.z);
       const bf = W(0, 0, 1); bf.y = 0; bf.normalize(); const h2 = V3(dv.x, 0, dv.z).normalize();
-      const ang = Math.atan2(bf.x * h2.z - bf.z * h2.x, bf.dot(h2)), lim = 1.2;
-      if (Math.abs(ang) > lim) { const r = h2.clone().applyAxisAngle(Y, -(ang - Math.sign(ang) * lim)); look.x = hp0.x + r.x * hz; look.z = hp0.z + r.z * hz; }
-      for (const [bone, k] of [[B.Neck, 0.3], [B.Head, 1]]) { const hpw = wpos(B.Head).add(V3(0, 0.09, 0));
+      let ang = Math.atan2(bf.x * h2.z - bf.z * h2.x, bf.dot(h2));
+      const back = Math.abs(ang) > 1.9; S.lookW = smN(S.lookW ?? 1, back ? 0 : 1, 3, dt);
+      ang *= S.lookW;
+      const tw = Math.sign(ang) * Math.min(0.42, Math.max(0, Math.abs(ang) - 0.6) * 0.7);
+      S.tw = smN(S.tw ?? 0, tw, 4, dt);
+      rotW(B.Spine1, Y, -S.tw * 0.45); rotW(B.Spine2, Y, -S.tw * 0.55);
+      hp0 = wpos(B.Head).add(V3(0, 0.09, 0));
+      const lim = 0.8 + Math.abs(S.tw), a2 = Math.max(-lim, Math.min(lim, ang));
+      const r = bf.clone().applyAxisAngle(Y, -a2); look.x = hp0.x + r.x * hz; look.z = hp0.z + r.z * hz;
+      dv = look.clone().sub(hp0); const mx = hz * Math.tan(P.drink > 0.3 ? 0.6 : 0.5);
+      if (dv.y > mx) look.y = hp0.y + mx;
+      for (const [bone, k] of [[B.Neck, 0.12], [B.Head, 1]]) { const hpw = wpos(B.Head).add(V3(0, 0.09, 0));
         const fwdH = headFwdLocal.clone().applyQuaternion(B.Head.getWorldQuaternion(tq)).normalize();
         const d = new THREE.Quaternion().setFromUnitVectors(fwdH, look.clone().sub(hpw).normalize()); d.slerp(new THREE.Quaternion(), 1 - k);
         bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(d)); } }
