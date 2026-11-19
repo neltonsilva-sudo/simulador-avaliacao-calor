@@ -126,17 +126,17 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   const restOf = (name) => { const i = sk01.bones.findIndex((b) => b.name === name); if (i < 0) return null;
     const m = sk01.boneInverses[i].clone().invert(); return new THREE.Vector3().setFromMatrixPosition(m); }; // espaço de bind já é y-cima (= vRest)
   const sh = restOf('Bip01_L_UpperArm') || new THREE.Vector3(17, 138, -6), el = restOf('Bip01_L_Forearm') || new THREE.Vector3(36, 121, -6);
-  const U = { uLogo: { value: logoTex() }, uPk: { value: pk }, uSh: { value: sh }, uEl: { value: el }, uLogoOn: { value: 1 }, uDust: { value: new THREE.Color(0.22, 0.2, 0.18) }, uDustK: { value: 0.35 } };
+  const U = { uLogo: { value: logoTex() }, uPk: { value: pk }, uSh: { value: sh }, uEl: { value: el }, uLogoOn: { value: 1 }, uTw: { value: 1 }, uDust: { value: new THREE.Color(0.22, 0.2, 0.18) }, uDustK: { value: 0.35 } };
   const texNavy = navyAtlas(colI), texWhite = navyAtlas(colI, [242, 241, 236], [214, 212, 204], true);
   const mat = inject(new THREE.MeshPhysicalMaterial({ map: texNavy, normalMap: new THREE.CanvasTexture(nrmI), normalScale: new THREE.Vector2(0.8, 0.8),
     roughnessMap: rough(spcI), roughness: 1, metalness: 0, sheen: 0.5, sheenColor: new THREE.Color(0x8a9ab8), sheenRoughness: 0.6, specularIntensity: 0.3, side: THREE.DoubleSide }), {
-    decl: NOISE + `\nuniform sampler2D uLogo; uniform vec3 uPk, uSh, uEl; uniform float uLogoOn, uDustK; uniform vec3 uDust;
+    decl: NOISE + `\nuniform sampler2D uLogo; uniform vec3 uPk, uSh, uEl; uniform float uLogoOn, uDustK, uTw; uniform vec3 uDust;
       float twill(vec3 p) { return p.x * 0.7 + p.y + p.z * 0.7; }`,
     color: `{ vec3 q = vRest;
       // sarja: listras diagonais finas (some com a distância → sem moiré)
       float ph = twill(q) * 9.0; float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(ph));
-      diffuseColor.rgb *= 1.0 + 0.07 * aa * sin(ph * 6.2832);
-      diffuseColor.rgb *= 0.93 + 0.1 * vn(q * vec3(1.6, 0.6, 1.6));
+      diffuseColor.rgb *= 1.0 + 0.07 * uTw * aa * sin(ph * 6.2832);
+      diffuseColor.rgb *= 1.0 - uTw * 0.07 + uTw * 0.1 * vn(q * vec3(1.6, 0.6, 1.6));
       // poeira/desgaste: barra e joelhos da calça, punhos, lado de baixo das mangas
       float dust = smoothstep(40.0, 10.0, q.y) * (0.55 + 0.45 * vn(q * 0.9)) * 0.4;
       dust += smoothstep(5.0, 0.0, length(vec2(abs(q.x) - 9.5, q.y - 48.0) * vec2(0.9, 0.55))) * step(0.0, q.z) * 0.35 * vn(q * 1.7);
@@ -157,10 +157,10 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
         diffuseColor.rgb = mix(diffuseColor.rgb, L.rgb * th, L.a); wMask = max(wMask, L.a); } }`,
     rough: 'roughnessFactor = mix(clamp(roughnessFactor, 0.78, 1.0), 0.6, wMask * 0.6);',
     normal: `{ vec3 q = vRest; float ph = twill(q) * 9.0; float aa = 1.0 - smoothstep(0.25, 0.6, fwidth(ph));
-      vec3 tw = normalize(vec3(0.7, 1.0, 0.7)) * cos(ph * 6.2832) * 0.18 * aa;
+      vec3 tw = normalize(vec3(0.7, 1.0, 0.7)) * cos(ph * 6.2832) * 0.18 * aa * uTw;
       vec3 cq = vec3(q.x * 3.0, q.y * 0.9, q.z * 3.0); float e = 0.15;
       vec3 gr = vec3(vn(cq + vec3(e, 0, 0)) - vn(cq - vec3(e, 0, 0)), vn(cq + vec3(0, e, 0)) - vn(cq - vec3(0, e, 0)), vn(cq + vec3(0, 0, e)) - vn(cq - vec3(0, 0, e)));
-      normal = normalize(normal - mat3(viewMatrix) * (gr * 0.55 + tw)); }` }, U);
+      normal = normalize(normal - mat3(viewMatrix) * (gr * 0.55 * uTw + tw)); }` }, U);
   mat.normalMap.needsUpdate = true;
   const mesh = new THREE.SkinnedMesh(geo, mat); mesh.name = 'uniforme_F01'; mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
   m01.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);
@@ -168,5 +168,6 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   mesh.bind(new THREE.Skeleton(mapped, inv), G.clone().multiply(m01.bindMatrix));
   const setEnv = (env) => { const w = env === 'fornos'; mat.map = w ? texWhite : texNavy; U.uLogoOn.value = w ? 0 : 1;
     U.uDust.value.set(...(w ? [0.93, 0.88, 0.76] : [0.06, 0.055, 0.05])); U.uDustK.value = w ? 0.5 : 0.45; mat.sheenColor.set(w ? 0xffffff : 0x8a9ab8); mat.needsUpdate = true; };
-  return { mesh, pants: true, sleeves: true, setEnv };
+  const setTwill = (k) => { U.uTw.value = k; mat.normalScale.setScalar(0.8 * (0.45 + 0.55 * k)); };
+  return { mesh, pants: true, sleeves: true, setEnv, setTwill };
 }

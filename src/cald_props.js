@@ -77,6 +77,37 @@ export function buildProps(ctx) {
       add(G.boxGeo(0.48, 0.07, 0.46), M.fabricI, [0, 0.47, 0.0]);
       add(G.boxGeo(0.44, 0.5, 0.06), M.fabricI, [0, 0.82, -0.27]); g.children[g.children.length - 1].rotation.x = 0.12;
       add(G.boxGeo(0.04, 0.2, 0.04), M.blackPlasticI, [0, 0.55, -0.25]); }
+    // telão do supervisório na parede x1 (voltado para −x, visível de fora pelo vidro) e quadro sinóptico na parede z1
+    const bigScreen = (w, h, pos, rotY, kind) => {
+      const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 576; const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      const g = new THREE.Group(); g.position.set(...pos); g.rotation.y = rotY; group.add(g);
+      const bz = new THREE.Mesh(G.boxGeo(w + 0.05, h + 0.05, 0.05), M.blackPlasticI); bz.position.z = -0.03; g.add(bz);
+      const sc = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(1.4, 1.4, 1.4) })); sc.userData.noAO = true; g.add(sc);
+      ctx.screens.push({ ctx: cv.getContext('2d'), tex: t, W: 1024, H: 576, kind, id: 1 });
+    };
+    bigScreen(1.25, 0.7, [x1 - 0.12, 1.75, 7.0], -Math.PI / 2, 'scada');
+    bigScreen(1.25, 0.7, [x1 - 0.12, 1.75, 8.45], -Math.PI / 2, 'cald');
+    { const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 512; const x = cv.getContext('2d');
+      x.fillStyle = '#e9ece8'; x.fillRect(0, 0, 1024, 512); x.strokeStyle = '#2b2f33'; x.lineWidth = 6; x.strokeRect(6, 6, 1012, 500);
+      x.fillStyle = '#1c3a6e'; x.fillRect(6, 6, 1012, 60); x.fillStyle = '#fff'; x.font = '800 34px Arial'; x.textAlign = 'center'; x.fillText('FLUXOGRAMA — CASA DE CALDEIRAS', 512, 48);
+      const boiler = (bx, lbl) => { x.strokeStyle = '#333'; x.lineWidth = 5; x.fillStyle = '#c9d3dc'; x.beginPath(); x.roundRect(bx, 200, 240, 110, 55); x.fill(); x.stroke(); x.fillStyle = '#111'; x.font = '700 24px Arial'; x.fillText(lbl, bx + 120, 262); };
+      boiler(60, 'CALD-01'); boiler(360, 'CALD-02');
+      x.strokeStyle = '#c4231c'; x.lineWidth = 9; x.beginPath(); x.moveTo(180, 200); x.lineTo(180, 120); x.lineTo(820, 120); x.moveTo(480, 200); x.lineTo(480, 120); x.moveTo(820, 120); x.lineTo(820, 230); x.stroke();
+      x.fillStyle = '#c9d3dc'; x.fillRect(740, 230, 160, 60); x.strokeRect(740, 230, 160, 60); x.fillStyle = '#111'; x.font = '700 22px Arial'; x.fillText('DISTRIBUIDOR', 820, 268);
+      x.strokeStyle = '#2f7a46'; x.lineWidth = 7; x.beginPath(); x.moveTo(180, 310); x.lineTo(180, 420); x.lineTo(950, 420); x.moveTo(480, 310); x.lineTo(480, 420); x.stroke();
+      x.fillStyle = '#c9d3dc'; x.fillRect(900, 330, 80, 150); x.strokeStyle = '#333'; x.lineWidth = 5; x.strokeRect(900, 330, 80, 150); x.fillStyle = '#111'; x.font = '700 18px Arial'; x.fillText('DESAER.', 940, 410);
+      x.font = '600 20px Arial'; x.textAlign = 'left'; x.fillStyle = '#c4231c'; x.fillText('— vapor 10 kgf/cm²', 60, 480); x.fillStyle = '#2f7a46'; x.fillText('— água de alimentação', 300, 480);
+      for (const [lx, ly, c] of [[180, 160, '#22c55e'], [480, 160, '#22c55e'], [820, 170, '#ef4444']]) { x.fillStyle = c; x.beginPath(); x.arc(lx + 22, ly, 11, 0, 7); x.fill(); }
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.8), new THREE.MeshStandardMaterial({ map: t, roughness: 0.4 })); m.position.set(51.8, 1.75, z1 - 0.09); m.rotation.y = Math.PI; group.add(m); }
+    // livro de registro preenchido (folha com linhas manuscritas)
+    { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 700; const x = cv.getContext('2d'); x.fillStyle = '#f7f5ee'; x.fillRect(0, 0, 512, 700);
+      x.fillStyle = '#1b2a4a'; x.font = '800 22px Arial'; x.fillText('REGISTRO DE SEGURANÇA — CALD-01', 20, 40); x.font = '600 15px Arial'; x.fillText('Data   Hora   Pressão   Nível   Ocorrência   Operador', 20, 72);
+      x.strokeStyle = '#9fb3cf'; for (let y = 90; y < 690; y += 28) { x.beginPath(); x.moveTo(15, y); x.lineTo(497, y); x.stroke(); }
+      x.fillStyle = '#20316b'; x.font = 'italic 17px Georgia, serif'; const rows = ['18/11  06:00  9,6  52%  Purga de fundo OK', '18/11  07:00  9,5  50%  Teste de nível OK', '18/11  07:30  9,6  51%  Vazamento gaxeta V-07', '18/11  08:00  9,4  53%  Aviso à manutenção', '18/11  09:00  9,6  52%  Sem anormalidades'];
+      rows.forEach((r, i) => x.fillText(r, 20, 112 + i * 28));
+      const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; const m = new THREE.Mesh(new THREE.PlaneGeometry(0.29, 0.4), new THREE.MeshStandardMaterial({ map: t, roughness: 0.9 }));
+      m.rotation.set(-Math.PI / 2, 0, -0.1 + Math.PI / 2); m.position.set(50.85, 0.7735, 8.75); group.add(m); }
     // split (evaporadora) na parede z1 e condensadora sobre o forro
     box('white', [52.6, 2.35, z1 - 0.18], [0.95, 0.3, 0.22]); box('blackPlastic', [52.6, 2.23, z1 - 0.3], [0.85, 0.02, 0.03]);
     box('white', [54.4, h + 0.42, 7.0], [0.85, 0.62, 0.32]); cyl('steelDark', V(54.4, h + 0.45, 7.17), V(54.4, h + 0.45, 7.19), 0.23, 24);

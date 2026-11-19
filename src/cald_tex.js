@@ -168,10 +168,10 @@ export function floorMacro() {
   x.fillStyle = '#8d8f8c'; x.fillRect(0, 0, N, M);
   rx.fillStyle = 'rgb(255,92,255)'; rx.fillRect(0, 0, N, M); // rugosidade base ~0.36 (epóxi gasto)
   // mosqueado amplo
-  for (let k = 0; k < 420; k++) {
+  for (let k = 0; k < 1100; k++) {
     const px = r() * N, py = r() * M, rr = S(0.4 + r() * 2.2), dk = r() < 0.5;
     const g = x.createRadialGradient(px, py, 0, px, py, rr);
-    g.addColorStop(0, dk ? `rgba(60,62,58,${0.05 + r() * 0.08})` : `rgba(190,192,186,${0.05 + r() * 0.07})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    g.addColorStop(0, dk ? `rgba(52,50,44,${0.07 + r() * 0.12})` : `rgba(190,192,186,${0.05 + r() * 0.07})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = g; x.fillRect(px - rr, py - rr, rr * 2, rr * 2);
   }
   // zonas de equipamento: epóxi verde (como FOTO 5) sob as caldeiras e o trocador, com borda
@@ -212,7 +212,7 @@ export function floorMacro() {
   // sujeira/fuligem junto às bases e manchas de óleo sob os queimadores e bombas
   const stain = (wx, wz, rad, a, col = '30,26,20') => { const g = x.createRadialGradient(X(wx), Z(wz), 0, X(wx), Z(wz), S(rad)); g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(0.6, `rgba(${col},${a * 0.45})`); g.addColorStop(1, `rgba(${col},0)`); x.fillStyle = g; x.beginPath(); x.ellipse(X(wx), Z(wz), S(rad), S(rad * (0.6 + r() * 0.5)), r() * 3, 0, 7); x.fill(); };
   for (const b of BOILERS.filter((b) => b.kind === 'flamotubular')) { stain(b.c[0], b.c[2] + b.L / 2 + 0.25, 0.7, 0.3); stain(b.c[0] + 0.4, b.c[2] + b.L / 2 + 0.1, 0.35, 0.35, '20,18,14'); for (let k = 0; k < 6; k++) stain(b.c[0] + (r() - 0.5) * 2.6, b.c[2] + (r() - 0.5) * 5, 0.3 + r() * 0.5, 0.12 + r() * 0.12); }
-  for (let k = 0; k < 30; k++) stain(HALL2.x0 + 1 + r() * (W - 2), HALL2.z0 + 1 + r() * (D - 2), 0.15 + r() * 0.6, 0.05 + r() * 0.1);
+  for (let k = 0; k < 90; k++) stain(HALL2.x0 + 1 + r() * (W - 2), HALL2.z0 + 1 + r() * (D - 2), 0.15 + r() * 0.6, 0.05 + r() * 0.1);
   // poça de condensado sob o vazamento da gaxeta (molhado: escuro e espelhado) + rastro até o ralo
   const lk = LEAKS.find((l) => l.id === 'purgador');
   const wet = (wx, wz, rx0, rz0, a) => {

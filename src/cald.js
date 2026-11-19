@@ -21,7 +21,7 @@ function makeMaterials(stage) {
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   const paint = (color, rough = 1, o = {}) => std({ color, roughness: rough, roughnessMap: pt.rough, map: pt.map, normalMap: pt.normal, normalScale: N(0.35), metalness: 0.05, ...o });
   const M = {
-    clad: std({ color: 0xd9dcdf, metalness: 1, roughness: 0.62, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
+    clad: std({ color: 0xedf0f2, metalness: 1, roughness: 0.62, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
     door: std({ color: 0xf2f0ec, metalness: 1, roughness: 1.35, map: TX.spunTextures().map, roughnessMap: TX.spunTextures().rough, normalMap: TX.spunTextures().normal, normalScale: N(0.18) }),
     steelHot: std({ color: 0xcfccc6, metalness: 1, roughness: 0.95, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.35) }),
     steel: std({ color: 0xc8cacc, metalness: 1, roughness: 0.75, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.3) }),
@@ -43,7 +43,7 @@ function makeMaterials(stage) {
     rubber: std({ color: 0x161718, roughness: 0.75 }), rubberMat: std({ color: 0x222325, roughness: 0.9 }), blackPlastic: std({ color: 0x18191b, roughness: 0.45 }),
     grating: std({ color: 0x7b7f82, metalness: 0.7, roughness: 0.5 }), white: std({ color: 0xeef0ef, roughness: 0.45 }), pvc: std({ color: 0xd6d8d6, roughness: 0.4 }),
     label: std({ color: 0xf4f4f0, roughness: 0.5 }), ledGreen: std({ color: 0x1f8f3f, emissive: 0x33ff66, emissiveIntensity: 1.5 }), ledRed: std({ color: 0x8f1f1f, emissive: 0xff3322, emissiveIntensity: 1.2 }),
-    cabFloor: std({ color: 0x8a8f93, roughness: 0.5 }), cabWall: paint(0xdde0e2, 0.8), desk: std({ color: 0xbfc3c4, roughness: 0.55 }), board: std({ color: 0xf0f0ec, roughness: 0.35 }),
+    cabFloor: std({ color: 0x8a8f93, roughness: 0.5 }), cabWall: paint(0xa9aeb2, 0.8), desk: std({ color: 0xbfc3c4, roughness: 0.55 }), board: std({ color: 0xf0f0ec, roughness: 0.35 }),
     paper: std({ color: 0xf6f5f0, roughness: 0.9 }), bookBlue: std({ color: 0x1c3a6e, roughness: 0.7 }), mug: std({ color: 0xf2f2ee, roughness: 0.3 }), lampPanel: std({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 3.5 }),
     wood: std({ color: 0x9a7a52, roughness: 0.85 }), sack: std({ color: 0xe8e6de, roughness: 0.95 }), gasket: std({ color: 0x2b2b2b, roughness: 0.8 }), glassFrame: std({ color: 0xd8e2e8, metalness: 0.2, roughness: 0.05, transparent: true, opacity: 0.4 }),
     fabric: std({ color: 0x23262b, roughness: 0.95 }), bottle: std({ color: 0x9ec9ec, roughness: 0.1, transparent: true, opacity: 0.6 }),

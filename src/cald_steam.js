@@ -14,7 +14,7 @@ void main(){
   float c = cos(iData.y), s = sin(iData.y);
   vec2 p = position.xy; vCorner = p * 2.0;
   mv.xy += mat2(c, s, -s, c) * p * iPos.w;
-  vUv = uv; vA = iData.x * smoothstep(0.25, uNearFade, -mv.z); vTile = iData.z; vWorld = iPos.xyz; vHot = iData.w;
+  vUv = uv; vA = iData.x * smoothstep(0.9, uNearFade, -mv.z); vTile = iData.z; vWorld = iPos.xyz; vHot = iData.w;
   gl_Position = projectionMatrix * mv;
 }`;
 const FS = /* glsl */`
@@ -46,7 +46,7 @@ export function createSteam(ctx, emitters) {
   geo.setAttribute('iPos', aPos); geo.setAttribute('iData', aDat); geo.instanceCount = 0;
   const U = {
     tAtlas: { value: puffAtlas() }, uAmb: { value: new THREE.Color(1.05, 1.08, 1.12) }, uSun: { value: new THREE.Color(1.6, 1.55, 1.45) },
-    uSunDir: { value: new THREE.Vector3(-0.35, -0.85, -0.4).normalize() }, uCam: { value: new THREE.Vector3() }, uWin: { value: new THREE.Color(0.9, 0.95, 1.0) }, uNearFade: { value: 1.1 },
+    uSunDir: { value: new THREE.Vector3(-0.35, -0.85, -0.4).normalize() }, uCam: { value: new THREE.Vector3() }, uWin: { value: new THREE.Color(0.9, 0.95, 1.0) }, uNearFade: { value: 2.6 },
   };
   const mat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: U, transparent: true, depthWrite: false, depthTest: true });
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 10; mesh.name = 'cald_steam';
@@ -59,9 +59,9 @@ export function createSteam(ctx, emitters) {
   const E = [];
   for (const [id, e] of Object.entries(emitters)) {
     const cfg = {
-      purgador: { rate: 120, life: [5.5, 9.0], v0: 3.0, spread: 0.26, s0: 0.06, grow: 0.75, a0: 1.0, drag: 1.9, buoy: 0.55, hot: 1 },
-      respiro: { rate: 80, life: [7, 11], v0: 2.4, spread: 0.16, s0: 0.14, grow: 0.75, a0: 0.95, drag: 0.9, buoy: 0.5, hot: 0.8 },
-      flash: { rate: 60, life: [6, 9.5], v0: 1.8, spread: 0.18, s0: 0.1, grow: 0.7, a0: 0.9, drag: 0.9, buoy: 0.55, hot: 0.8 },
+      purgador: { rate: 70, life: [4.5, 7.5], v0: 2.6, spread: 0.13, s0: 0.03, grow: 0.36, a0: 0.33, drag: 1.25, buoy: 0.65, hot: 1 },
+      respiro: { rate: 45, life: [7, 11], v0: 2.0, spread: 0.1, s0: 0.08, grow: 0.42, a0: 0.3, drag: 0.9, buoy: 0.55, hot: 0.8 },
+      flash: { rate: 35, life: [6, 9.5], v0: 1.6, spread: 0.12, s0: 0.07, grow: 0.42, a0: 0.3, drag: 0.9, buoy: 0.55, hot: 0.8 },
       dreno: { rate: 5, life: [1.8, 3.2], v0: 0.35, spread: 0.6, s0: 0.05, grow: 0.16, a0: 0.18, drag: 1.2, buoy: 0.35, hot: 0.4 },
     }[id]; if (!cfg) continue;
     E.push({ id, pos: e.pos.clone(), dir: e.dir.clone().normalize(), acc: 0, on: 1, ...cfg });
@@ -69,7 +69,7 @@ export function createSteam(ctx, emitters) {
   // névoa de vapor acumulada sob o telhado (grandes tufos quase estáticos)
   const HZ = [];
   for (const e of E.filter((q) => q.id !== 'dreno')) for (let k = 0; k < 9; k++) {
-    HZ.push({ p: new THREE.Vector3(e.pos.x + (R() - 0.5) * 7, CEIL - 0.3 - R() * 1.6, e.pos.z + (R() - 0.2) * 5), s: 3.5 + R() * 3.5, a: 0.07 + R() * 0.07, rot: R() * 6, tile: (R() * 4) | 0, ph: R() * 6, w: 0.05 + R() * 0.08 });
+    HZ.push({ p: new THREE.Vector3(e.pos.x + (R() - 0.5) * 7, CEIL - 0.3 - R() * 1.6, e.pos.z + (R() - 0.2) * 5), s: 3.0 + R() * 3.0, a: 0.04 + R() * 0.05, rot: R() * 6, tile: (R() * 4) | 0, ph: R() * 6, w: 0.05 + R() * 0.08 });
   }
   const tmp = new THREE.Vector3();
   function noise(x, y, z, t) { return Math.sin(x * 1.7 + t * 0.9 + Math.sin(z * 1.3 + t * 0.5)) * Math.cos(y * 1.1 - t * 0.7 + z * 0.4); }
@@ -109,7 +109,7 @@ export function createSteam(ctx, emitters) {
       const q = items[i];
       if (q.e) {
         const f = q.age / q.life, e = q.e;
-        const a = q.a0 * Math.min(1, q.age / 0.12) * Math.pow(1 - f, 1.4) * Math.min(1, Math.max(0.36, 0.75 / Math.max(0.05, q.s)));
+        const a = q.a0 * Math.min(1, q.age / 0.12) * Math.pow(1 - f, 1.4) * Math.min(1, Math.max(0.3, 0.5 / Math.max(0.05, q.s)));
         pa[n * 4] = q.p.x; pa[n * 4 + 1] = q.p.y; pa[n * 4 + 2] = q.p.z; pa[n * 4 + 3] = q.s;
         da[n * 4] = a; da[n * 4 + 1] = q.rot; da[n * 4 + 2] = q.tile; da[n * 4 + 3] = e.hot * (1 - f);
       } else {

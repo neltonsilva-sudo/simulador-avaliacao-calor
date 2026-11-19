@@ -508,13 +508,13 @@ function buildFloorOverlay({ flourSpots, floorShadows, obstacles }) {
   // farinha: bancada (mais concentrada do lado da forneira), pallets, masseira/divisora (por nome), trilha bancada → fornos
   const bx = BENCH.pos[0], bz = BENCH.pos[2];
   for (let i = 0; i < 260; i++) { const a = R() * 6.28, r = Math.pow(R(), 1.6); const wx = bx + Math.cos(a) * r * (BENCH.w * 0.75), wz = bz + 0.35 + Math.sin(a) * r * 0.9; blob(wx, wz, 0.05 + R() * 0.3, 0.04 + R() * 0.2, FL, 0.05 + R() * 0.12 * (1 - r), R() * 3); }
-  for (let i = 0; i < 2500; i++) { const wx = bx + (R() - 0.5) * BENCH.w * 1.3, wz = bz + (R() - 0.2) * 1.4; x.fillStyle = `rgba(${FL},${0.15 + R() * 0.35})`; x.fillRect(U(wx), V(wz), 1 + R() * 2.5, 1 + R() * 2.5); }
+  for (let i = 0; i < 2500; i++) { const wx = bx + (R() - 0.5) * BENCH.w * 1.3, wz = bz + (R() - 0.2) * 1.4; x.fillStyle = `rgba(${FL},${0.03 + R() * 0.08})`; x.fillRect(U(wx), V(wz), 0.6 + R() * 1.0, 0.6 + R() * 1.0); } // pó fino (antes parecia confete)
   const named = [];
   for (const o of obstacles) if (o.tag === 'mach' && /mass|mixer|amass|divis|cilindr|modelad/i.test(o.name)) named.push(o.box);
   for (const b of named) { const cxw = (b.min.x + b.max.x) / 2, czw = (b.min.z + b.max.z) / 2, rw = (b.max.x - b.min.x) / 2 + 0.6, rd = (b.max.z - b.min.z) / 2 + 0.6; for (let i = 0; i < 60; i++) blob(cxw + (R() - 0.5) * rw * 2, czw + (R() - 0.5) * rd * 2, 0.06 + R() * 0.25, 0.05 + R() * 0.2, FL, 0.04 + R() * 0.1, R() * 3); }
   for (const [fx, fz, r0] of flourSpots) {
     for (let i = 0; i < 90; i++) { const a = R() * 6.28, r = r0 * (0.4 + R() * 0.7); blob(fx + Math.cos(a) * r, fz + Math.sin(a) * r, 0.04 + R() * 0.25, 0.04 + R() * 0.18, FL, 0.05 + R() * 0.14, R() * 3); }
-    for (let i = 0; i < 6; i++) blob(fx + (R() - 0.5) * 1.6, fz + 0.6 + R() * 0.5, 0.04 + R() * 0.05, 0.03 + R() * 0.04, FL, 0.45, R() * 3); // derramado
+    for (let i = 0; i < 6; i++) blob(fx + (R() - 0.5) * 1.6, fz + 0.6 + R() * 0.5, 0.04 + R() * 0.05, 0.03 + R() * 0.04, FL, 0.16, R() * 3); // derramado
   }
   // pegadas enfarinhadas (bancada → forno 1), alternando pés, esmaecendo
   function footprints(a, b, n0 = 0.18) {

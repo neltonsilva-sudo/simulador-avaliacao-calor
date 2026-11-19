@@ -465,7 +465,7 @@ export async function buildWorker(stage, app) {
     for (let j = 0; j <= NE; j++) for (let i = 0; i <= NA; i++) {
       const a = (i / NA) * Math.PI * 2, t = j / NE, y0 = rimY(a), y = y0 + (yc + ry - y0) * Math.sin(t * Math.PI / 2);
       const k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)), puff = 1 + 0.11 * Math.sin(t * Math.PI) + (0.022 * Math.sin(a * 7 + t * 9 + 1.3 * Math.sin(a * 3)) + 0.012 * Math.sin(a * 17 - t * 13)) * Math.sin(t * Math.PI) - 0.04 * Math.max(0, Math.cos(a)) * Math.sin(t * Math.PI);
-      const pleat = 1 + 0.035 * Math.pow(1 - t, 3) * Math.sin(a * 46 + 2 * Math.sin(a * 5)) - 0.03 * Math.pow(1 - t, 6);
+      const pleat = 1 + 0.06 * Math.pow(1 - t, 2.5) * Math.sin(a * 46 + 2 * Math.sin(a * 5)) - 0.03 * Math.pow(1 - t, 6);
       const r = k * puff * pleat; pos.push(Math.sin(a) * rx * r, y + 0.006 * Math.sin(t * Math.PI), cz + Math.cos(a) * rz * r); uv.push(i / NA * 8, t * 2);
     }
     for (let j = 0; j < NE; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + NA + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
@@ -473,13 +473,97 @@ export async function buildWorker(stage, app) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cg = cv.getContext('2d'); const im = cg.createImageData(128, 128);
     for (let i = 0; i < im.data.length; i += 4) { const v = 150 + Math.random() * 105; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } cg.putImageData(im, 0, 0);
     const bt = new THREE.CanvasTexture(cv); bt.wrapS = bt.wrapT = THREE.RepeatWrapping;
-    const tm = new THREE.MeshPhysicalMaterial({ color: 0xf3f3f0, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8, bumpMap: bt, bumpScale: 0.6, side: THREE.DoubleSide });
+    const net = document.createElement('canvas'); net.width = net.height = 64; { const ng = net.getContext('2d'); ng.strokeStyle = '#fff'; ng.lineWidth = 6; ng.beginPath(); ng.moveTo(0, 32); ng.lineTo(32, 0); ng.lineTo(64, 32); ng.lineTo(32, 64); ng.closePath(); ng.stroke(); }
+    const nt = new THREE.CanvasTexture(net); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(7, 4);
+    const tm = new THREE.MeshPhysicalMaterial({ color: 0xf7f7f4, roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), alphaMap: nt, transparent: true, depthWrite: false, opacity: 0.9, side: THREE.DoubleSide });
+    const em = new THREE.MeshPhysicalMaterial({ color: 0xf2f2ee, roughness: 0.8, sheen: 0.5, sheenColor: new THREE.Color(0xffffff) });
     touca = new THREE.Group(); touca.name = 'touca'; touca.add(new THREE.Mesh(g, tm));
+    const inner = new THREE.Mesh(g.clone().scale(0.93, 1, 0.93).translate(0, -0.006, cz * 0.07), new THREE.MeshPhysicalMaterial({ color: 0x24160f, roughness: 0.55, sheen: 0.8, sheenColor: new THREE.Color(0x6a4a36), bumpMap: bt, bumpScale: 1.2 }));
+    inner.position.y = -0.004; touca.add(inner);
     const rim = []; for (let i = 0; i <= 160; i++) { const a = i / 160 * Math.PI * 2, y = rimY(a), k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)) * (0.985 + 0.012 * Math.sin(a * 46)); rim.push(V3(Math.sin(a) * rx * k, y + 0.002, cz + Math.cos(a) * rz * k)); }
-    touca.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 240, 0.0042, 6, true), tm));
+    touca.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 240, 0.0062, 8, true), em));
     shadowed(touca); head.frame.add(touca);
   }
 
+  // ══════ R2: luvas volumosas, avental, rede/touca de malha com cabelo preso, coque + abafador (caldeiras) ══════
+  const canvasTex = (W, H, draw, rep) => { const c = document.createElement('canvas'); c.width = W; c.height = H; draw(c.getContext('2d'), W, H); const t = new THREE.CanvasTexture(c); if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...rep); } return t; };
+  // luvas: térmica (forneira, A1) = manopla acolchoada azul-acinzentada de punho longo; vaqueta (caldeiras) = punho de couro
+  const quilt = canvasTex(64, 64, (g) => { g.fillStyle = '#888'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#333'; g.lineWidth = 3; for (let k = -64; k < 128; k += 16) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 64, 64); g.moveTo(k + 64, 0); g.lineTo(k, 64); g.stroke(); } }, [3, 3]);
+  const thermM = new THREE.MeshPhysicalMaterial({ color: 0x4d6280, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0x9fb4d0), bumpMap: quilt, bumpScale: 2.5 });
+  const leathM = new THREE.MeshPhysicalMaterial({ color: 0x8a5a2c, roughness: 0.72, sheen: 0.3, sheenColor: new THREE.Color(0xd8b080) });
+  const gloves = { 1: [], 2: [] };
+  for (const sd of ['L', 'R']) {
+    const w = wpos(B[sd + '_Hand']), dF = wpos(B[sd + '_Finger2']).sub(w).normalize(), up0 = Y.clone().sub(dF.clone().multiplyScalar(dF.y)).normalize(), sd3 = dF.clone().cross(up0);
+    const basis = new THREE.Matrix4().makeBasis(dF, up0, sd3), q = new THREE.Quaternion().setFromRotationMatrix(basis);
+    const mk = (geo, mat, c) => { const m = new THREE.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(c); m.castShadow = true; scene0.add(m); m.updateMatrixWorld(true); B[sd + '_Hand'].attach(m); return m; };
+    const scene0 = stage.scene;
+    const cuffG = new THREE.CylinderGeometry(0.056, 0.047, 0.17, 22, 1, true).rotateZ(Math.PI / 2);
+    const tg = new THREE.Group();
+    const parts = [mk(cuffG, thermM, w.clone().addScaledVector(dF, -0.07)),
+      mk(new THREE.TorusGeometry(0.056, 0.008, 8, 24).rotateY(Math.PI / 2), thermM, w.clone().addScaledVector(dF, -0.155)),
+      mk(new THREE.SphereGeometry(1, 22, 14).scale(0.11, 0.036, 0.062), thermM, w.clone().addScaledVector(dF, 0.075)),
+      mk(new THREE.SphereGeometry(1, 14, 10).scale(0.05, 0.026, 0.024), thermM, wpos(B[sd + '_Finger0']).addScaledVector(dF, 0.02))];
+    gloves[1].push(...parts); void tg;
+    gloves[2].push(mk(new THREE.CylinderGeometry(0.047, 0.042, 0.075, 20, 1, true).rotateZ(Math.PI / 2), leathM, w.clone().addScaledVector(dF, -0.035)));
+  }
+  [...gloves[1], ...gloves[2]].forEach((m) => { m.material.side = THREE.DoubleSide; m.visible = false; });
+
+  // avental branco-cru: peito (Spine2) + saia (pivô no quadril, balança com a coxa) + alça do pescoço + cordão com laço
+  const apron = { parts: [], skirtPivot: null };
+  {
+    const P0g = P0, prof = new Float32Array(200).fill(-99), back = new Float32Array(200).fill(99), half = new Float32Array(200).fill(0);
+    for (let i = 0; i < P.count; i++) { if (grpOf[i] !== 0) continue; const x = P0g[i * 3], up = P0g[i * 3 + 2], fz = -P0g[i * 3 + 1], b = Math.round(up); if (b < 0 || b >= 200) continue;
+      if (Math.abs(x) < 11) { prof[b] = Math.max(prof[b], fz); back[b] = Math.min(back[b], fz); } if (Math.abs(x) < 24 && up > 85 && up < 115) half[b] = Math.max(half[b], Math.abs(x)); }
+    const zf = (u) => { let m = -99; for (let b = Math.round(u) - 2; b <= Math.round(u) + 2; b++) m = Math.max(m, prof[b] ?? -99); return m; };
+    const hipZ = Math.max(...[96, 98, 100, 102].map(zf));
+    const cloth = canvasTex(128, 128, (g, W, H) => { const im = g.createImageData(W, H); for (let i = 0; i < im.data.length; i += 4) { const x = (i / 4) % W, y = (i / 4 / W) | 0; const v = 200 + 25 * ((x + y) % 2) + 20 * Math.random(); im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } g.putImageData(im, 0, 0); }, [30, 30]);
+    const am = new THREE.MeshPhysicalMaterial({ color: 0xe9e2d2, roughness: 0.9, sheen: 0.3, sheenColor: new THREE.Color(0xffffff), bumpMap: cloth, bumpScale: 0.25, side: THREE.DoubleSide });
+    const sheet = (u0, u1, wTop, wBot, zOf, NU = 18, NV = 24) => {
+      const pos = [], idx = [], uv = [];
+      for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) { const t = j / NV, u = u1 + (u0 - u1) * t, hw = wTop + (wBot - wTop) * t, x = -hw + 2 * hw * i / NU;
+        pos.push(x, u, zOf(u, x / hw, t)); uv.push(i / NU, t); }
+      for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const a = j * (NU + 1) + i, b = a + NU + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals(); return g; };
+    const toBone = (geo, bone, mat = am) => { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; fbx.add(m); m.updateMatrixWorld(true); bone.attach(m); apron.parts.push(m); return m; };
+    // peito: 101 → 137 cm, alarga para baixo
+    toBone(sheet(101, 137, 11, 16, (u, s) => Math.max(zf(u), u < 112 ? hipZ : -99) + 2.4 - 3.2 * s * s), B.Spine2);
+    // saia: pivô no quadril
+    const hipC = wpos(B.L_Thigh).add(wpos(B.R_Thigh)).multiplyScalar(0.5);
+    const piv = holderOn(B.Pelvis); piv.position.copy(relTo(B.Pelvis, fbx.worldToLocal(hipC.clone()).toArray())); apron.skirtPivot = piv; piv.userData.q0 = piv.quaternion.clone();
+    const sk = new THREE.Mesh(sheet(54, 102, 20, 24, (u, s, t) => hipZ + 2.6 + 1.2 * t - 7 * s * s + 0.5 * Math.sin(s * 9 + t * 3) * t), am); sk.castShadow = sk.receiveShadow = true;
+    fbx.add(sk); sk.updateMatrixWorld(true); piv.attach(sk); apron.parts.push(sk);
+    // alça do pescoço e cordão da cintura com laço nas costas
+    const zN = zf(136) + 2.4;
+    const strapP = [[10.5, 136.5, zN - 0.6], [8.6, 143, zN - 2.2], [6.8, 148, -2.5], [3.5, 150.2, -7.5], [0, 150.6, -9.0], [-3.5, 150.2, -7.5], [-6.8, 148, -2.5], [-8.6, 143, zN - 2.2], [-10.5, 136.5, zN - 0.6]].map((p) => V3(...p));
+    toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(strapP), 48, 0.75, 6), B.Spine2);
+    const yW = 101.5, zc = (zf(yW) + 2.8 + back[101] - 3.0) / 2, zr = (zf(yW) + 2.8 - (back[101] - 3.0)) / 2, xr = (half[101] || 16) + 3.0;
+    const cord = []; for (let k = 0; k <= 64; k++) { const a = k / 64 * Math.PI * 2; cord.push(V3(Math.sin(a) * xr, yW, zc + Math.cos(a) * zr)); }
+    toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(cord, true), 96, 0.8, 6, true), B.Spine);
+    const bz = zc - zr - 0.8;
+    for (const s of [-1, 1]) { toBone(new THREE.TorusGeometry(3.2, 0.75, 8, 20).scale(1.35, 0.75, 0.45).translate(s * 4.0, yW + 0.6, bz - 0.4), B.Spine);
+      toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(0, yW, bz), V3(s * 2.0, yW - 7, bz - 1.2), V3(s * 3.2, yW - 16, bz - 1.0)]), 14, 0.75, 6), B.Spine); }
+  }
+
+  // cabelo preso: massa de cabelo sob a rede (forneira) e coque baixo com rede sob o capacete (operadora)
+  const hairM = new THREE.MeshPhysicalMaterial({ color: 0x24160f, roughness: 0.55, sheen: 0.8, sheenColor: new THREE.Color(0x6a4a36), sheenRoughness: 0.4,
+    bumpMap: canvasTex(64, 256, (g) => { for (let y = 0; y < 256; y++) for (let x = 0; x < 64; x++) { g.fillStyle = `rgb(${(100 + 155 * Math.random()) | 0},0,0)`; g.fillRect(x, y, 1, 3); } }, [10, 2]), bumpScale: 1.5 });
+  const netTex = canvasTex(64, 64, (g) => { g.clearRect(0, 0, 64, 64); g.strokeStyle = '#fff'; g.lineWidth = 7; g.beginPath(); g.moveTo(0, 32); g.lineTo(32, 0); g.lineTo(64, 32); g.lineTo(32, 64); g.closePath(); g.stroke(); }, [6, 3]);
+  let bun = null;
+  if (head?.frame && head.debug) {
+    const d = head.debug;
+    bun = new THREE.Group(); bun.name = 'coque';
+    const b = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16).scale(0.046, 0.038, 0.034), hairM); b.position.set(0, -0.045, d.zB - 0.012); bun.add(b);
+    const n = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16).scale(0.049, 0.041, 0.037), new THREE.MeshStandardMaterial({ color: 0x1a1210, alphaMap: netTex, alphaTest: 0.5, transparent: false, roughness: 0.6, side: THREE.DoubleSide })); n.position.copy(b.position); bun.add(n);
+    head.frame.add(shadowed(bun));
+    // abafador tipo concha acoplado ao capacete (amarelo, almofada preta)
+    const cupM = new THREE.MeshPhysicalMaterial({ color: 0xe8b400, roughness: 0.4, clearcoat: 0.5 }), padM = std(0x141414, 0.85), armM2 = std(0x222326, 0.4, 0.6);
+    bun.userData.muffs = [];
+    for (const s of [1, -1]) { const e = head.anchors?.[s > 0 ? 'earL' : 'earR']; if (!e) continue; const g = new THREE.Group(); g.position.copy(e.position).add(V3(s * 0.03, 0.004, -0.004)); head.frame.add(g);
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.04, 0.03, 0.05).rotateZ(-s * Math.PI / 2), cupM); shell.position.x = s * 0.006; g.add(shell);
+      const pad = new THREE.Mesh(new THREE.TorusGeometry(0.036, 0.011, 8, 24).scale(1, 1.25, 1).rotateY(Math.PI / 2), padM); g.add(pad);
+      const arm = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(s * 0.03, 0.03, 0), V3(s * 0.035, 0.065, 0.004), V3(s * 0.02, 0.09, 0.006)]), 10, 0.0045, 6), armM2); g.add(arm);
+      shadowed(g); bun.userData.muffs.push(g); }
+  }
   // ── ambiente: forneira de branco × operadora de caldeira de azul-marinho ──
   let BM = null; try { BM = await import('./worker_boots.js'); } catch (e) { /* sem botina */ }
   let envCur = null;
@@ -490,7 +574,10 @@ export async function buildWorker(stage, app) {
     BM?.BOOT_U?.uBootCol.value.setRGB(...(w ? [0.62, 0.62, 0.6] : [0.011, 0.01, 0.0095]));
     const P = head?.parts || {}; for (const k of ['helmet', 'glasses', 'hair', 'strap']) if (P[k]) P[k].visible = !w;
     for (const e of [head?.anchors?.earL, head?.anchors?.earR]) e?.children.forEach((c) => (c.visible = !w));
-    if (touca) touca.visible = w; valve.visible = !w;
+    if (touca) touca.visible = w; valve.visible = !w; if (P.hair) P.hair.visible = false;
+    if (bun) { bun.visible = !w; bun.userData.muffs.forEach((m) => (m.visible = !w)); }
+    apron.parts.forEach((m) => (m.visible = w));
+    uni?.setTwill?.(w ? 0.25 : 1);
   }
   applyEnv(app?.state?.env || 'fornos');
   app?.on?.('env', (e) => applyEnv(e));
@@ -502,7 +589,8 @@ export async function buildWorker(stage, app) {
   const CHAIN = { forno: [[6.95, -3.3], [6.95, -0.6]], bancada: [[5.2, -0.5]], descanso: [[-5.2, 3.6], [-4.5, 0.6]],
     caldeira: [[36.2, 0.5]], valvulas: [[47.9, -5.5], [47.6, 0.4]], controle: [[51.3, 6.2], [49.85, 6.2], [49.85, 8.92], [47.4, 8.6]] };
   const SEAT = { descanso: 0.45, controle: 0.505 };
-  const PATROL = { 'bancada:A4': [[5.2, -0.5], [6.6, -0.5]], 'valvulas:A4': [[47.9, -5.5], [47.9, -2.6]] };
+  const PATROL = { 'bancada:A4': [[5.2, -0.5], [6.6, -0.5]], 'valvulas:A4': [[47.9, -5.5], [47.9, -2.6]], 'caldeira:A1': [[35.1, -0.72, -1.88, 18]] };
+  const PANEL = V3(34.62, 1.47, -0.86);
   const fwdOf = (r) => new THREE.Vector2(Math.sin(r), Math.cos(r));
   const standOf = (id) => { const s = ST[id], w = new THREE.Vector2(s.worker[0], s.worker[2]); return s.seated ? w.add(fwdOf(s.workerRotY).multiplyScalar(id === 'controle' ? 0.36 : 0.3)) : w; };
   const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -557,7 +645,7 @@ export async function buildWorker(stage, app) {
       L.sitW = L.mode === 'sitdown' ? k : 1 - k; if (L.sitT >= 1) next(); return 0;
     }
     if (L.mode === 'stand' && L.patrol) { L.wait -= dt; if (L.wait < 0) { L.pIdx = (L.pIdx + 1) % L.patrol.length; const tg = L.patrol[L.pIdx];
-      const back = L.pIdx === 0; L.queue = [walk([[L.pos.x, L.pos.y], tg]), ...(back ? [turn(ST[L.st].workerRotY)] : []), () => { L.wait = back ? 2.5 : 1.0; L.mode = 'stand'; }]; next(); } }
+      const back = L.pIdx === 0, isC = L.st === 'caldeira'; L.queue = [walk([[L.pos.x, L.pos.y], tg]), ...(back ? [turn(ST[L.st].workerRotY)] : tg[2] != null ? [turn(tg[2])] : []), () => { L.wait = back ? (isC ? 14 : 2.5) : (tg[3] ?? 1.0); L.mode = 'stand'; }]; next(); } }
     return 0;
   }
 
@@ -595,7 +683,9 @@ export async function buildWorker(stage, app) {
         P.look = k > 0.3 ? BP(0, 1.6, 1.0) : (Math.floor(T / 4) % 2 ? camPos() : BP(0.6, 1.0, 2.5));
       }
     } else {
-      if (a === 'A1' && L.st === 'caldeira' && !moving) {
+      if (a === 'A1' && L.st === 'caldeira' && !moving && L.pos.distanceTo(new THREE.Vector2(35.1, -0.72)) < 0.3) {
+        const tap = Math.max(0, Math.sin(T * 2.6)) ** 6; const dP = PANEL.clone().sub(V3(L.pos.x, 1.35, L.pos.y)).normalize(); P.hR = PANEL.clone().add(V3(0.04 * Math.sin(T * 0.7), 0.05 * Math.sin(T * 0.45), 0)).addScaledVector(dP, -0.15 - 0.02 * (1 - tap)); P.gripR = 0.35; P.fdirR = 'point'; P.lean = 0.1; P.look = PANEL.clone().add(V3(0, 0.03, 0));
+      } else if (a === 'A1' && L.st === 'caldeira' && !moving) {
         const u = T % 16;
         if (u < 4) P.look = V3(35.42, 2.3, -1.44); else if (u < 7) P.look = V3(36.85, 3.48, -2.1);
         else if (u < 11) { P.look = V3(36.36, 1.49, -1.0); P.lean = 0.22; } else { P.look = V3(36.0, 1.25, -1.25); P.lean = 0.2; P.hL = V3(36.0, 1.28, -1.22); P.gripL = 0.8; }
@@ -606,9 +696,9 @@ export async function buildWorker(stage, app) {
         P.hL = ang(Math.PI - 0.55 - rot); P.hR = ang(0.55 - rot); P.gripL = P.gripR = 0.9; P.lean = 0.1; P.look = c.clone();
       } else if (a === 'A3' && L.mode === 'seated') {
         P.book = true; P.pen = true; P.lean = 0.32;
-        const bk = BP(0.03, SEAT.controle + 0.27, 0.57), wr = (T % 6) < 4.5;
+        const bk = BP(0.03, SEAT.controle + 0.27, 0.5), wr = (T % 6) < 4.5;
         P.hR = bk.clone().add(BP(-0.07 + 0.08 * ((T * 0.25) % 1) - L.pos.x * 0, 0, 0).sub(BP(0, 0, 0))).add(V3(0, 0.03 + (wr ? 0.004 * Math.sin(T * 23) : 0.03), 0));
-        P.hL = bk.clone().add(BP(0.13, 0, 0.02).sub(BP(0, 0, 0))).add(V3(0, 0.025, 0)); P.gripR = 0.7; P.fdirL = 'down';
+        P.hL = bk.clone().add(BP(0.2, 0, -0.06).sub(BP(0, 0, 0))).add(V3(0, 0.03, 0)); P.gripR = 0.7; P.fdirL = 'down'; P.fdirR = 'down';
         P.look = bk; P.bookPos = bk;
       }
     }
@@ -626,7 +716,7 @@ export async function buildWorker(stage, app) {
     L.walkW = smN(L.walkW, L.mode === 'walk' ? Math.min(1, L.v / 0.55) : L.mode === 'turn' ? 0.45 : 0, 7, dt);
     const ww = L.walkW, sw = L.sitW, ph = L.phase;
     const bob = ww * (0.018 * Math.cos(2 * ph) - 0.02);
-    const sitDrop = (hipRest - L.hipSeat) * sw;
+    const sitDrop = (hipRest - L.hipSeat) * sw + (1 - ww) * (1 - sw) * 0.006;
     group.position.set(L.pos.x, bob - sitDrop, L.pos.y);
     group.rotation.y = L.head; group.updateMatrixWorld(true); gqNow.copy(group.quaternion);
     const side = W(1, 0, 0), fwd = W(0, 0, 1), P = activityPose(t), br = Math.sin(t * 2 * Math.PI / 4.2);
@@ -637,13 +727,16 @@ export async function buildWorker(stage, app) {
     rotW(B.Spine1, side, S.lean * 0.55 + 0.03 * ww + br * 0.01); rotW(B.Spine2, side, S.lean * 0.45 + br * 0.014);
     // pernas: caminhada (oscilador) + sentar (quadril/joelho 90°)
     const phiS = 0.12, cs = (L.hipSeat - ankH - Lc * Math.cos(phiS)) / Lt, thS = Math.acos(Math.max(-1, Math.min(1, cs)));
+    let maxTh = -1;
     for (const [sd, off, sx] of [['L', 0, 1], ['R', Math.PI, -1]]) {
-      const p = ph + off, A = 0.36 * ww, th = A * Math.sin(p) * (1 - sw) + thS * sw;
-      const knee = (ww * (0.06 + 0.9 * Math.pow(Math.max(0, Math.cos(p)), 2))) * (1 - sw) + (thS - phiS) * sw + (1 - ww) * (1 - sw) * 0.03;
+      const p = ph + off, A = 0.36 * ww, th = A * Math.sin(p) * (1 - sw) + thS * sw + (1 - ww) * (1 - sw) * 0.06;
+      const knee = (ww * (0.06 + 0.9 * Math.pow(Math.max(0, Math.cos(p)), 2))) * (1 - sw) + (thS - phiS) * sw + (1 - ww) * (1 - sw) * 0.12;
       rotW(B[sd + '_Thigh'], side, -th); rotW(B[sd + '_Thigh'], fwd, -sx * 0.07 * sw);
       rotW(B[sd + '_Calf'], side, knee);
       rotW(B[sd + '_Foot'], side, (th - knee) - 0.12 * ww * Math.max(0, Math.cos(p)) * (1 - sw));
+      maxTh = Math.max(maxTh, th);
     }
+    if (apron.skirtPivot) apron.skirtPivot.quaternion.copy(apron.skirtPivot.userData.q0).multiply(_q.setFromAxisAngle(V3(1, 0, 0), -Math.min(1.35, Math.max(0, maxTh) * 0.9)));
     // cabeça (antes dos braços: clavículas são filhas do pescoço)
     smV(S.look, P.look, 3.5, dt);
     { const look = S.look.clone(), hp0 = wpos(B.Head).add(V3(0, 0.09, 0)), dv = look.clone().sub(hp0), hz = Math.hypot(dv.x, dv.z), mx = hz * Math.tan(P.drink > 0.3 ? 0.6 : 0.5);
@@ -665,7 +758,8 @@ export async function buildWorker(stage, app) {
       const handDown = elbowDown.clone().add(W(sx * 0.06, -1, 0.22 + swing * 1.4 + 0.15 * sw).normalize().multiplyScalar(0.25));
       const target = S[wk] > 0.01 && S[key] ? handDown.clone().lerp(S[key], S[wk]) : handDown;
       if (sw > 0.5 && !tgt) target.copy(BP(sx * 0.15, L.hipSeat + 0.1, 0.25));
-      ik(sd, target, W(sx * 0.75, -0.55, -0.45).normalize());
+      ik(sd, target, (L.mode === 'seated' && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
+      if (fdir === 'point' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], PANEL, 0.85);
       if (fdir === 'down' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], wpos(B[sd + '_Hand']).add(W(0, -0.55, 1).normalize()), 0.7);
       handPose(sd, grip * Math.max(S[wk], 0.15));
     }
@@ -675,6 +769,7 @@ export async function buildWorker(stage, app) {
     cup.visible = !!P.cup; pen.visible = !!P.pen;
     book.visible = !!P.book && !!P.bookPos; if (book.visible) { book.position.copy(P.bookPos).setY(SEAT.controle + 0.2575); book.rotation.set(0, L.head + Math.PI, 0); }
     dough.visible = !!P.dough && envCur !== 'caldeiras'; if (dough.visible) { const sq = 0.5 + 0.5 * Math.abs(Math.sin(L.actT * 2.5)); dough.position.copy(BP(0, 0.9 + 0.03, 0.44)); dough.scale.set(1 + 0.25 * sq, 0.55 - 0.12 * sq, 1.1 + 0.2 * sq); }
+    gloves[1].forEach((m) => (m.visible = P.glove === 1)); gloves[2].forEach((m) => (m.visible = P.glove === 2));
     armU.uGlove.value = P.glove ? 1 : 0; armU.uGloveCol.value.set(...(P.glove === 2 ? [0.42, 0.27, 0.13] : [0.42, 0.42, 0.4]));
     // piscar
     S.blinkT -= dt; if (S.blinkT < 0) { S.blink = 0.14; S.blinkT = 2.5 + Math.random() * 3.5; }

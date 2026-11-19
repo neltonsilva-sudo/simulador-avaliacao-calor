@@ -204,6 +204,10 @@ export function buildEquipment(ctx) {
     ctx.sign('quente', V(fx, 1.2, fz + 0.385), V(0, 0, 1), 0.2);
   }
 
+  // tubulações baixas ao longo da parede do fundo (condensado, água, ar comprimido) com suportes
+  { for (const [y, r, k] of [[2.55, 0.06, 'steel'], [2.85, 0.045, 'paintGreen'], [3.1, 0.035, 'paintBlue']]) pipe(k, [V(30.3, y, -9.45), V(55.7, y, -9.45)], r);
+    for (let x = 32; x < 55.5; x += 2.5) box('steelDark', [x, 2.45, -9.72], [0.06, 0.06, 0.55]); }
+
   // ═════════════ LINHA AÉREA ISOLADA (aerea) + descida ao coletor ═════════════
   const aer = PIPES.find((p) => p.id === 'aerea'), col = PIPES.find((p) => p.id === 'coletor');
   const ay = aer.c[1], az = aer.c[2], ax0 = aer.c[0] - aer.L / 2 + 0.5, ax1 = aer.c[0] + aer.L / 2; // 36.5 → 50
