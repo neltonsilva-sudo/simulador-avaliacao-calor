@@ -27,6 +27,7 @@ export const PIPES = [
 export const LEAKS = [
   { id: 'purgador', label: 'Vazamento na gaxeta da válvula do distribuidor', pos: [48.7, 1.55, -8.1], rate: 0.8 },
   { id: 'respiro', label: 'Respiro do desaerador', pos: [53.6, 4.6, -6.6], rate: 0.6 },
+  { id: 'flash', label: 'Respiro do vaso de flash (entre as caldeiras)', pos: [39.6, 3.44, -7.2], rate: 0.7 },
 ];
 // Situações térmicas do operador de caldeira (mesma semântica de STATIONS em layout.js).
 export const STATIONS2 = {

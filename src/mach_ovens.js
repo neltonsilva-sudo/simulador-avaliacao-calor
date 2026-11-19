@@ -13,9 +13,9 @@ export function plate(B, key, x0, y0, x1, y1, zF, th = 0.02, holes = [], bev = 0
   return B.add(g, key, [0, 0, zF - th + bev]);
 }
 /** cavidade aberta na frente (5 faces internas) */
-function cavity(B, keyWall, keyTop, keyFloor, x0, x1, y0, y1, zb, zf) {
+function cavity(B, keyWall, keyTop, keyFloor, x0, x1, y0, y1, zb, zf, keyBack = keyWall) {
   const w = x1 - x0, h = y1 - y0, d = zf - zb, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (zb + zf) / 2;
-  B.plane(keyWall, w, h, [cx, cy, zb], [0, 0, 0]);                         // fundo
+  B.plane(keyBack, w, h, [cx, cy, zb], [0, 0, 0]);                         // fundo
   B.plane(keyWall, d, h, [x0, cy, cz], [0, Math.PI / 2, 0]);               // esquerda (normal +x)
   B.plane(keyWall, d, h, [x1, cy, cz], [0, -Math.PI / 2, 0]);              // direita
   B.plane(keyTop, w, d, [cx, y1, cz], [Math.PI / 2, 0, 0]);                // teto (normal −y)
@@ -80,20 +80,26 @@ export function buildTurbo(o, ctx) {
   for (const y of [0.6, 1.0, 1.4, 1.8]) for (const x of [-W + 0.03, W - 0.03]) B.cyl('steelPol', 0.004, 0.003, [x, y, zF + 0.0215], 'z', 8);
   // cavidade incandescente
   const cz0 = zF - 0.56, cz1 = zF - 0.01;
-  cavity(B, 'cav1', 'cav1t', 'cav1f', ox0, ox1, oy0, oy1, cz0, cz1);
+  cavity(B, 'cav1', 'cav1t', 'cav1f', ox0, ox1, oy0, oy1, cz0, cz1, 'cav1b');
   gasket(B, 'steelDark', ox0 - 0.03, oy0 - 0.03, zF - 0.05, ox1 + 0.03, oy1 + 0.03, zF + 0.01, 0.032);   // batente da boca
   // guias laterais e esteiras com pães (5 níveis)
   const levels = [0.665, 0.845, 1.025, 1.205, 1.385];
+  // estante lateral cromada: montantes na frente e no fundo de cada lado + trilho por nível (as esteiras apoiam nele)
+  const rz0 = cz0 + 0.04, rz1 = cz1 - 0.07;
+  for (const x of [ox0 + 0.018, ox1 - 0.018]) {
+    for (const z of [rz0, rz1]) B.box('chrome', x - 0.006, oy0 + 0.02, z - 0.006, x + 0.006, oy1 - 0.08, z + 0.006, 0.002, 1);
+    for (const y of levels) B.box('chrome', x - 0.007, y - 0.014, rz0, x + 0.007, y - 0.004, rz1, 0.002, 1);
+  }
   for (const y of levels) {
-    tray(B, (ox0 + ox1) / 2, y, cz0 + 0.25, ox1 - ox0 - 0.05, 0.46);
+    wireRack(B, (ox0 + ox1) / 2, y - 0.002, (rz0 + rz1) / 2, ox1 - ox0 - 0.03, rz1 - rz0, 'chrome');
     for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
-      const x = ox0 + 0.04 + (i + 0.5) * (ox1 - ox0 - 0.08) / 4 + jit(0.008), z = cz0 + 0.1 + j * 0.145 + jit(0.01);
-      ctx.bread('bun', g, x, y + 0.004, z, R() * 6.28, 0.95 + jit(0.06), 0.85 + 0.3 * (y - 0.6) + (j === 2 ? 0.1 : 0));
+      const x = ox0 + 0.04 + (i + 0.5) * (ox1 - ox0 - 0.08) / 4 + jit(0.008), z = rz0 + 0.07 + j * 0.15 + jit(0.01);
+      ctx.bread('bun', g, x, y + 0.002, z, R() * 6.28, 0.95 + jit(0.06), 0.7 + 0.16 * j + 0.2 * (y - 0.6));
     }
   }
   // lâmpadas halógenas na parede esquerda (FOTO 2: dois clarões à esquerda no alto)
   for (const [y, z] of [[1.6, cz1 - 0.1], [1.31, cz1 - 0.1]]) { B.cyl('lamp', 0.028, 0.012, [ox0 + 0.006, y, z], 'x', 18); ctx.glow(g, ox0 + 0.03, y, z, 0.22, 1.0); }
-  ctx.lightAnchor.forno1 = new THREE.Vector3(o.x + (ox0 + ox1) / 2 - 0.15, 1.45, -6 + cz1 - 0.25);
+  ctx.lightAnchor.forno1 = new THREE.Vector3(o.x + (ox0 + ox1) / 2 - 0.1, oy1 - 0.04, -6 + cz1 - 0.2);
   // ── porta (dobradiça à esquerda)
   const dx0 = ox0 - 0.055, dx1 = ox1 + 0.055, dy0 = oy0 - 0.055, dy1 = oy1 + 0.055, dth = 0.065;
   const piv = doorPivot(g, dx0, zF + 0.022); const D = new Batch();
@@ -126,9 +132,9 @@ function hood(B, x0, x1, y0, y1, zf) {
   s.moveTo(zb, y1); s.lineTo(zf - 0.04, y1); s.lineTo(zf, y1 - 0.18); s.lineTo(zf, y0); s.lineTo(zb, y0); s.closePath();
   const g = new THREE.ExtrudeGeometry(s, { depth: x1 - x0, bevelEnabled: true, bevelSize: 0.004, bevelThickness: 0.004, bevelSegments: 1 });
   B.add(g, 'steel', [x0, 0, 0], [0, -Math.PI / 2, 0], [1, 1, 1]).applyMatrix4(new THREE.Matrix4().makeTranslation(x1 - x0, 0, 0));
-  B.box('grille', x0 + 0.04, y0 - 0.004, zb + 0.06, x1 - 0.04, y0 + 0.002, zf - 0.06, 0);           // filtros (escuros)
+  B.box('grilleHood', x0 + 0.05, y0 - 0.026, zb + 0.07, x1 - 0.05, y0 - 0.02, zf - 0.07, 0);           // filtros (escuros)
   const n = Math.max(2, Math.round((x1 - x0) / 0.5));
-  for (let i = 1; i < n; i++) { const x = x0 + (i / n) * (x1 - x0); B.box('steelSat', x - 0.01, y0 - 0.008, zb + 0.06, x + 0.01, y0 + 0.002, zf - 0.06, 0.002, 1); }
+  for (let i = 1; i < n; i++) { const x = x0 + (i / n) * (x1 - x0); B.box('steelSat', x - 0.012, y0 - 0.034, zb + 0.06, x + 0.012, y0 - 0.006, zf - 0.06, 0.002, 1); }
   B.box('steelPol', x0, y0 - 0.012, zf - 0.03, x1, y0 + 0.012, zf + 0.004, 0.004); // calha frontal
 }
 // a geometria da coifa é extrudada ao longo de z e girada: −π/2 em y leva +z (extrusão) → +x? (corrigido pela translação)
@@ -166,7 +172,7 @@ export function buildVitrine(o, ctx) {
   lv.forEach((y, k) => {
     wireRack(B, (ox0 + ox1) / 2, y, (cz0 + cz1) / 2, ox1 - ox0 - 0.06, 0.52);
     const n = k === 2 ? 2 : 3;
-    for (let i = 0; i < n; i++) { const x = (ox0 + ox1) / 2 + (i - (n - 1) / 2) * 0.27 + jit(0.01); ctx.bread('boule', g, x, y + 0.004, (cz0 + cz1) / 2 + 0.06 + jit(0.02), jit(0.15), 1.18 + jit(0.06), 0.95); }
+    for (let i = 0; i < n; i++) { const x = (ox0 + ox1) / 2 + (i - (n - 1) / 2) * 0.27 + jit(0.01); ctx.bread('boule', g, x, y + 0.004, (cz0 + cz1) / 2 + 0.06 + jit(0.02), jit(0.15), 1.18 + jit(0.06), 1.2); }
   });
   for (const x of [-0.13, 0.13]) { const X = (ox0 + ox1) / 2 + x; B.cyl('lamp', 0.032, 0.014, [X, oy1 - 0.008, cz0 + 0.12], 'y', 16); ctx.glow(g, X, oy1 - 0.04, cz0 + 0.14, 0.34, 1.4); }
   // ── porta (puxador vertical à esquerda → dobradiça à direita)
@@ -228,10 +234,12 @@ export function buildLastro4(o, ctx) {
     const y0 = dr.y0, y1 = dr.y0 + dr.h;
     // frontal entre câmaras (faixa inox + puxador horizontal abaixo de cada porta)
     const fy0 = y0 - 0.16 + (k === 0 ? 0.07 : 0), fy1 = y0 - 0.025;
-    B.box('steel', colL1 + 0.012, fy0, zF - 0.02, colR0 - 0.012, fy1, zF + 0.025, 0.006);
+    B.box('steel', colL1 + 0.012, fy0, zF - 0.02, colR0 - 0.012, fy1 + 0.013, zF + 0.025, 0.006);
     handle(B, [dx0 + 0.12, (fy0 + fy1) / 2 + 0.005, zF + 0.025], [dx1 - 0.12, (fy0 + fy1) / 2 + 0.005, zF + 0.025], 0.04, 0.012);
     // moldura preta da boca + interior
-    plate(B, 'black', colL1 + 0.012, y0 - 0.025, colR0 - 0.012, y1 + 0.03, zF + 0.0, 0.03, [[dx0 + 0.005, y0 + 0.005, dx1 - 0.005, y1 - 0.005]], 0.003);
+    plate(B, 'black', dx0 - 0.04, y0 - 0.012, dx1 + 0.04, y1 + 0.016, zF + 0.0, 0.03, [[dx0 + 0.005, y0 + 0.005, dx1 - 0.005, y1 - 0.005]], 0.003);
+    for (const [sx, sy] of [[dx0 - 0.02, y1 + 0.004], [dx1 + 0.02, y1 + 0.004], [(dx0 + dx1) / 2, y1 + 0.004], [dx0 - 0.02, y0], [dx1 + 0.02, y0]]) B.cyl('steelPol', 0.006, 0.006, [sx, sy, zF + 0.003], 'z', 10);
+    for (const sx of [dx0 - 0.03, dx1 + 0.03]) B.box('blackGloss', sx - 0.02, y1 + 0.016, zF - 0.004, sx + 0.02, y1 + 0.04, zF + 0.006, 0.002, 1);
     cavity(B, 'cav4', 'cav4t', 'cav4f', dx0, dx1, y0, y1, cz0, cz1 - 0.03);
     // lastro (pedra) e pães franceses
     B.box('stone', dx0 + 0.01, y0, cz0 + 0.02, dx1 - 0.01, y0 + 0.012, cz1 - 0.05, 0, 1);
@@ -261,7 +269,7 @@ export function buildLastro4(o, ctx) {
     D.plane('fxDeck', dx1 - dx0 - 0.055, ph - 0.065, [(dx0 + dx1) / 2, ph / 2, 0.025]);
     D.box('steelPol', dx0 + 0.25, ph - 0.02, 0.03, dx1 - 0.25, ph - 0.008, 0.045, 0.004, 1);
     D.build(M, piv, { name: `vertical-door${k}` });
-    (ctx.doorObjs.vertical ||= []).push({ pivot: piv, type: 'drop', sign: 1, max: 1.25, delay: k * 0.12 });
+    (ctx.doorObjs.vertical ||= []).push({ pivot: piv, type: 'drop', sign: 1, max: 1.15, delay: k * 0.12, base: 0.11 });
     (ctx.steam.vertical ||= []).push({ x0: o.x + dx0, x1: o.x + dx1, y: y1, z: -6 + zF + 0.05, ceil: 2.13 });
   });
   // fascia superior e coifa saliente

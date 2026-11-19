@@ -51,13 +51,13 @@ export function roundRect(x, X, Y, w, h, r) { x.beginPath(); x.moveTo(X + r, Y);
 let _clad = null;
 export function cladTextures() {
   if (_clad) return _clad;
-  const N = 512, M = 512, r = rng(17);
+  const N = 1024, M = 1024, r = rng(17);
   const dent = fbm(N, M, 6, 5, 4, 23), big = fbm(N, M, 2, 2, 3, 29), blot = fbm(N, M, 4, 4, 5, 31), fine = fbm(N, M, 64, 8, 2, 37);
   const h = new Float32Array(N * M);
   // amassados: elipses alongadas
   const [dc, dx] = cnv(N, M); dx.fillStyle = '#808080'; dx.fillRect(0, 0, N, M);
   for (let k = 0; k < 70; k++) {
-    const cx = r() * N, cy = r() * M, rx = 10 + r() * 45, ry = rx * (0.25 + r() * 0.6), a = r() * Math.PI, s = r() < 0.5 ? -1 : 1;
+    const cx = r() * N, cy = r() * M, rx = 20 + r() * 90, ry = rx * (0.25 + r() * 0.6), a = r() * Math.PI, s = r() < 0.5 ? -1 : 1;
     for (const ox of [-N, 0, N]) for (const oy of [-M, 0, M]) {
       const g = dx.createRadialGradient(0, 0, 0, 0, 0, 1); const v = 128 + s * (10 + r() * 20);
       g.addColorStop(0, `rgba(${v},${v},${v},0.55)`); g.addColorStop(1, 'rgba(128,128,128,0)');
@@ -89,7 +89,7 @@ export function cladTextures() {
     return [v * 0.995, v, v * 1.01];
   });
   const rough = putGray(N, M, (i) => { const m = md[i * 4] / 255; const v = 0.16 + (blot[i] - 0.5) * 0.12 + sst(0.55, 0.8, big[i]) * 0.1 + m * 0.18; return [1, v, 1]; });
-  _clad = { map: tex(alb, { srgb: true }), rough: tex(rough), normal: normalFromHeight(h, N, M, 2.2) };
+  _clad = { map: tex(alb, { srgb: true }), rough: tex(rough), normal: normalFromHeight(h, N, M, 1.3) };
   return _clad;
 }
 
@@ -97,8 +97,8 @@ export function cladTextures() {
 let _steel = null;
 export function steelTextures() {
   if (_steel) return _steel;
-  const N = 512, M = 512, r = rng(71), col = new Float32Array(M);
-  for (const [cells, amp] of [[512, 0.5], [256, 0.35], [128, 0.2], [64, 0.12]]) {
+  const N = 1024, M = 1024, r = rng(71), col = new Float32Array(M);
+  for (const [cells, amp] of [[1024, 0.5], [512, 0.35], [256, 0.2], [128, 0.12]]) {
     const lat = Array.from({ length: cells }, () => r());
     for (let x = 0; x < M; x++) { const f = (x * cells) / M, i = Math.floor(f), t = f - i, s = t * t * (3 - 2 * t); col[x] += (lat[i % cells] * (1 - s) + lat[(i + 1) % cells] * s) * amp; }
   }
@@ -160,7 +160,7 @@ export function floorDetail() {
 // ───────────── macro do piso (todo o galpão): cor base, faixas amarelas, manchas de óleo, poças, sujeira junto às bases ─────────────
 // u: x ∈ [x0,x1], v: z ∈ [z0,z1] (v = 0 em z0). Retorna {map (sRGB), rough (G)}.
 export function floorMacro() {
-  const W = HALL2.x1 - HALL2.x0, D = HALL2.z1 - HALL2.z0, PX = 48; // 48 px/m
+  const W = HALL2.x1 - HALL2.x0, D = HALL2.z1 - HALL2.z0, PX = 56; // 56 px/m
   const N = W * PX, M = D * PX; // 1664 × 1280
   const [c, x] = cnv(N, M), [rc, rx] = cnv(N, M);
   const X = (wx) => (wx - HALL2.x0) * PX, Z = (wz) => (wz - HALL2.z0) * PX, S = (m) => m * PX;
@@ -225,6 +225,14 @@ export function floorMacro() {
   };
   wet(lk.pos[0] + 0.05, -8.2, 0.75, 0.45, 0.42); wet(lk.pos[0] + 0.35, -8.7, 0.35, 0.25, 0.35); wet(lk.pos[0] - 0.4, -8.0, 0.25, 0.18, 0.3);
   wet(53.6, -5.3, 0.35, 0.25, 0.3);
+  // mais vida: manchas d'água das purgas/descargas, ferrugem sob suportes, marcas de paleteira, poeira junto às paredes
+  for (const b of BOILERS.filter((q) => q.kind === 'flamotubular')) { wet(b.c[0] + 0.1, -9.0, 0.45, 0.3, 0.32); wet(b.c[0] - 1.6, b.c[2] + b.L / 2 - 1.2, 0.3, 0.22, 0.25); wet(b.c[0] - 0.95, b.c[2] + b.L / 2 + 0.15, 0.22, 0.16, 0.3); }
+  for (const [px, pz] of [[51.7, -4.0], [53.5, -4.0]]) { wet(px - 0.4, pz + 0.35, 0.4, 0.25, 0.3); stain(px + 0.3, pz, 0.35, 0.3, '24,22,18'); }
+  wet(49.45, -8.6, 0.25, 0.5, 0.35); wet(51.6, 2.0, 0.4, 0.3, 0.22); wet(53.6, -5.6, 0.5, 0.3, 0.28);
+  for (const x of [44.4, 47.4, 50.7]) stain(x, -8.25, 0.18, 0.35, '96,54,26');
+  x.lineCap = 'round';
+  for (let k = 0; k < 14; k++) { const x0 = X(32 + r() * 20), z0 = Z(0.6 + r() * 3.4), L = S(2 + r() * 5), a = (r() - 0.5) * 0.5; x.strokeStyle = `rgba(30,30,28,${0.05 + r() * 0.06})`; x.lineWidth = S(0.06); x.beginPath(); x.moveTo(x0, z0); x.quadraticCurveTo(x0 + L * 0.5, z0 + Math.sin(a) * L * 0.3, x0 + L * Math.cos(a), z0 + L * Math.sin(a)); x.stroke(); x.beginPath(); x.moveTo(x0, z0 + S(0.5)); x.quadraticCurveTo(x0 + L * 0.5, z0 + S(0.5) + Math.sin(a) * L * 0.3, x0 + L * Math.cos(a), z0 + S(0.5) + L * Math.sin(a)); x.stroke(); }
+  for (const [ax, az, bx, bz] of [[HALL2.x0, HALL2.z0, HALL2.x1, HALL2.z0 + 0.6], [HALL2.x0, HALL2.z0, HALL2.x0 + 0.6, HALL2.z1], [HALL2.x1 - 0.6, HALL2.z0, HALL2.x1, HALL2.z1], [HALL2.x0, HALL2.z1 - 0.6, HALL2.x1, HALL2.z1]]) { x.fillStyle = 'rgba(70,66,58,0.12)'; x.fillRect(X(ax), Z(az), S(bx - ax), S(bz - az)); }
   // canaleta de drenagem ao longo da parede do fundo (z ≈ −9,55) — grelha desenhada
   x.fillStyle = '#2c2d2c'; x.fillRect(X(31.0), Z(-9.7), S(24), S(0.25));
   for (let gx = X(31.0); gx < X(55); gx += S(0.035)) { x.fillStyle = 'rgba(150,152,150,0.9)'; x.fillRect(gx, Z(-9.68), S(0.012), S(0.21)); }
@@ -461,4 +469,30 @@ export function panelFront(label = 'CALDEIRA 1') {
   x.fillStyle = '#222'; x.beginPath(); x.arc(150, 520, 30, 0, 7); x.fill(); x.fillStyle = '#ddd'; x.fillRect(146, 494, 8, 52); x.font = '700 14px Arial, sans-serif'; x.fillStyle = '#111'; x.fillText('MAN  0  AUT', 150, 570);
   x.fillStyle = '#f2c200'; x.beginPath(); x.moveTo(330, 480); x.lineTo(380, 565); x.lineTo(280, 565); x.closePath(); x.fill(); x.strokeStyle = '#111'; x.lineWidth = 5; x.stroke(); x.fillStyle = '#111'; x.font = '900 46px Arial, sans-serif'; x.fillText('⚡', 330, 540);
   return tex(c, { srgb: true, rep: false });
+}
+
+// ───────────── inox repuxado/torneado (tampo frontal): sulcos concêntricos, centro em (0,5; 0,5) ─────────────
+let _spun = null;
+export function spunTextures() {
+  if (_spun) return _spun;
+  const N = 1024, r = rng(501), ring = new Float32Array(2048);
+  for (const [cells, amp] of [[520, 0.45], [180, 0.3], [40, 0.25]]) { const lat = Array.from({ length: cells + 1 }, () => r()); for (let i = 0; i < 2048; i++) { const f = (i * cells) / 2048, k = Math.floor(f), t = f - k, s2 = t * t * (3 - 2 * t); ring[i] += (lat[k] * (1 - s2) + lat[k + 1] * s2) * amp; } }
+  const blot = fbm(N, N, 4, 4, 5, 503), h = new Float32Array(N * N);
+  const [fc, fx] = cnv(N); fx.fillStyle = '#000'; fx.fillRect(0, 0, N, N); fx.lineCap = 'round';
+  for (let k = 0; k < 140; k++) { const x = r() * N, y = r() * N, L = 10 + r() * 80, a = r() * Math.PI; fx.strokeStyle = `rgba(255,255,255,${0.1 + r() * 0.3})`; fx.lineWidth = 0.6 + r(); fx.beginPath(); fx.moveTo(x, y); fx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); fx.stroke(); }
+  for (let k = 0; k < 18; k++) { const x = r() * N, y = r() * N, L = 40 + r() * 160; const g = fx.createLinearGradient(x, y, x, y + L); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.15, 'rgba(255,255,255,0.25)'); g.addColorStop(1, 'rgba(255,255,255,0)'); fx.strokeStyle = g; fx.lineWidth = 3 + r() * 5; fx.beginPath(); fx.moveTo(x, y); fx.lineTo(x + (r() - 0.5) * 6, y + L); fx.stroke(); }
+  const fd = fx.getImageData(0, 0, N, N).data;
+  const ri = (i) => { const x = i % N, y = (i / N) | 0; return Math.hypot(x - N / 2, y - N / 2) / (N / 2); };
+  const alb = putGray(N, N, (i) => { const rr = ri(i), k = Math.min(2047, (rr * 2047) | 0), f = fd[i * 4] / 255; h[i] = ring[k] * 0.4 - f * 0.05; const v = 0.86 + (ring[k] - 0.6) * 0.06 + (blot[i] - 0.5) * 0.06 - f * 0.06 - sst(0.9, 1.0, rr) * 0.04; return [v + 0.01, v, v - 0.015]; });
+  const rough = putGray(N, N, (i) => { const rr = ri(i), k = Math.min(2047, (rr * 2047) | 0), f = fd[i * 4] / 255; return [1, 0.26 + (ring[k] - 0.6) * 0.1 + (blot[i] - 0.5) * 0.12 + f * 0.2, 1]; });
+  // normal: derivada radial dos sulcos
+  const [nc, nx] = cnv(N), img = nx.createImageData(N, N), d = img.data;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x, dx = x - N / 2, dy = y - N / 2, rr = Math.hypot(dx, dy) || 1, k = Math.min(2046, ((rr / (N / 2)) * 2047) | 0);
+    const g = (ring[k + 1] - ring[Math.max(0, k - 1)]) * 2.0; const ux = dx / rr, uy = dy / rr;
+    let ax = -g * ux, ay = g * uy, az = 1; const l = Math.hypot(ax, ay, az); d[i * 4] = (ax / l * 0.5 + 0.5) * 255; d[i * 4 + 1] = (ay / l * 0.5 + 0.5) * 255; d[i * 4 + 2] = (az / l * 0.5 + 0.5) * 255; d[i * 4 + 3] = 255;
+  }
+  nx.putImageData(img, 0, 0);
+  _spun = { map: tex(alb, { srgb: true, rep: false }), rough: tex(rough, { rep: false }), normal: tex(nc, { rep: false }) };
+  return _spun;
 }

@@ -15,11 +15,12 @@ function buildSteelEnv(renderer) {
   const tileC = T.canvas(256), x = tileC.getContext('2d'); x.fillStyle = '#d9dad6'; x.fillRect(0, 0, 256, 256); x.strokeStyle = '#9a9b97'; x.lineWidth = 6;
   for (let i = 0; i <= 4; i++) { x.beginPath(); x.moveTo(0, i * 64); x.lineTo(256, i * 64); x.stroke(); x.beginPath(); x.moveTo(i * 64, 0); x.lineTo(i * 64, 256); x.stroke(); }
   const tt = T.tex(tileC, true); tt.repeat.set(6, 1.5);
-  const wallM = new THREE.MeshBasicMaterial({ map: tt, color: new THREE.Color(0.75, 0.75, 0.74), side: THREE.BackSide });
+  const wallM = new THREE.MeshBasicMaterial({ map: tt, color: new THREE.Color(0.3, 0.3, 0.3), side: THREE.BackSide });
   const room = new THREE.Mesh(new THREE.BoxGeometry(17, 4, 12), [wallM, wallM, new THREE.MeshBasicMaterial({ color: 0x3a3c3e, side: THREE.BackSide }), new THREE.MeshBasicMaterial({ color: 0x55534f, side: THREE.BackSide }), wallM, wallM]);
   room.position.set(0, 1.6, 2); s.add(room);
   const add = (w, h, color, px, py, pz, ry = 0, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })); m.position.set(px, py, pz); m.rotation.set(rx, ry, 0); s.add(m); return m; };
-  for (const zz of [-1.2, 1.4, 4, 6.6]) add(13, 0.22, new THREE.Color(8, 8, 7.6), 0, 3.55, zz, 0, Math.PI / 2);
+  for (const zz of [-1.2, 1.4, 4, 6.6]) add(13, 0.09, new THREE.Color(30, 30, 28), 0, 3.55, zz, 0, Math.PI / 2);
+  for (const xx of [-6, -2, 2, 6]) add(0.07, 3.0, new THREE.Color(6, 6, 5.6), xx, 1.6, 7.95);   // reflexos verticais (montantes claros, janelas estreitas)
   // massas escuras (outras máquinas, portas, prateleiras) para dar contraste ao reflexo
   add(3, 2.2, 0x1a1b1c, -4, 1.1, 7.9); add(1.0, 2.1, 0x2b2620, 3.5, 1.05, 7.9); add(4, 0.9, 0x24262a, 1, 0.45, 7.85);
   add(2.5, 1.2, 0x15161a, -8.4, 1.0, 2, Math.PI / 2); add(2, 1.6, 0x202326, 8.4, 0.9, 4, Math.PI / 2);
@@ -40,8 +41,8 @@ export function buildMachines(stage, app) {
   // materiais de cavidade (textura HDR × intensidade) por forno
   const cav = (seed, lamps, inten, tint) => cavityMaterial(T.cavityTexture(seed, tint ? { lamps, tint } : { lamps }), inten);
   Object.assign(M, {
-    cav1: cav(11, [[0.25, 0.12, 1.0], [0.25, 0.4, 0.8]], 4.4, [1, 0.68, 0.28]), cav1t: cav(12, [[0.3, 0.8, 0.6]], 4.2, [1, 0.68, 0.28]), cav1f: cav(13, [], 2.6, [1, 0.64, 0.25]),
-    cav2: cav(21, [[0.35, 0.1, 1.4], [0.65, 0.1, 1.4]], 3.4, [1, 0.42, 0.035]), cav2t: cav(22, [[0.35, 0.8, 1.6], [0.65, 0.8, 1.6]], 3.6, [1, 0.44, 0.04]), cav2f: cav(23, [], 2.4, [1, 0.4, 0.03]),
+    cav1: cav(11, [[0.25, 0.12, 1.0], [0.25, 0.4, 0.8]], 4.0, [1, 0.72, 0.36]), cav1b: cav(14, [[0.5, 0.0, 0.5]], 3.4, [1, 0.7, 0.34]), cav1t: cav(12, [[0.3, 0.8, 0.6]], 4.2, [1, 0.68, 0.28]), cav1f: cav(13, [], 2.6, [1, 0.64, 0.25]),
+    cav2: cav(21, [[0.35, 0.1, 1.4], [0.65, 0.1, 1.4]], 5.0, [1, 0.5, 0.06]), cav2t: cav(22, [[0.35, 0.8, 1.6], [0.65, 0.8, 1.6]], 5.2, [1, 0.52, 0.07]), cav2f: cav(23, [], 3.6, [1, 0.48, 0.05]),
     cav3: cav(31, [[0.5, 0.05, 0.5]], 3.2), cav3t: cav(32, [[0.5, 0.85, 1.0]], 3.4), cav3f: cav(33, [], 2.0),
     cav4: cav(41, [[0.5, 0.05, 0.5]], 3.2), cav4t: cav(42, [[0.5, 0.85, 1.0]], 3.4), cav4f: cav(43, [], 2.0),
     cavR: cav(51, [[0.5, 0.06, 0.5]], 3.0, [1, 0.55, 0.18]), cavRt: cav(52, [[0.5, 0.5, 1]], 3.2, [1, 0.55, 0.18]), cavRf: cav(53, [], 1.8, [1, 0.52, 0.16]),
@@ -50,7 +51,7 @@ export function buildMachines(stage, app) {
   M.stone.userData.noAO = true;
   const fx = (t, k) => { const m = new THREE.MeshBasicMaterial({ map: t, color: new THREE.Color(k, k, k), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     m.userData.noShadow = true; m.userData.order = 3; return m; };
-  M.fxTurbo = fx(T.glassFxTexture(5, { bands: 2 }), 0.55);
+  M.fxTurbo = fx(T.glassFxTexture(5, { bands: 1, haze: 0.5 }), 0.22);
   M.fxVit = fx(T.glassFxTexture(7, { bands: 1, dots: 2, dotRows: 1 }), 0.4);
   M.fxDeck = fx(T.glassFxTexture(9, { bands: 1, dots: 7, dotRows: 2 }), 0.7);
   M.fxDeck2 = fx(T.glassFxTexture(13, { bands: 2, dots: 12, dotRows: 2 }), 0.6);
@@ -59,7 +60,7 @@ export function buildMachines(stage, app) {
 
   // ── pães (instancing): coletor por tipo × pai × dentro/fora ──
   const breadGeo = {
-    bun: bunGeometry('baking', { r: 0.058, h: 0.05, seed: 1 }), bunBaked: bunGeometry('baked', { r: 0.056, h: 0.05, seed: 4 }),
+    bun: bunGeometry('baking', { r: 0.058, h: 0.05, seed: 1, slash: true, flour: 0.6 }), bunBaked: bunGeometry('baked', { r: 0.056, h: 0.05, seed: 4 }),
     bunRaw: bunGeometry('raw', { r: 0.052, h: 0.036, seed: 7 }),
     baguette: baguetteGeometry('rustic', { L: 0.48, R: 0.036, cuts: 5 }), baguetteOut: baguetteGeometry('baked', { L: 0.48, R: 0.031, cuts: 5, seed: 5 }),
     baguetteRaw: baguetteGeometry('raw', { L: 0.44, R: 0.026, cuts: 5, seed: 9 }),
@@ -109,7 +110,7 @@ export function buildMachines(stage, app) {
   }
 
   // ── luzes: interior do forno 1 (sempre), vazamento do forno 1 (porta aberta) e uma luz itinerante para os demais ──
-  const inner = new THREE.PointLight(0xff9a3c, 0.8, 1.0, 2); inner.position.copy(ctx.lightAnchor.forno1 || new THREE.Vector3(7.1, 1.4, -5.3)); root.add(inner);
+  const inner = new THREE.PointLight(0xffc070, 1.6, 1.3, 2); inner.position.copy(ctx.lightAnchor.forno1 || new THREE.Vector3(7.1, 1.4, -5.3)); root.add(inner);
   const o1 = OVENS.find((o) => o.id === 'forno1'), d1 = o1.doors[0];
   const spill1 = new THREE.PointLight(0xff9a48, 0, 4.2, 2); spill1.position.set(o1.x + d1.cx, d1.y0 + d1.h * 0.6, HALL.z0 + o1.d + 0.18); root.add(spill1);
   const spill2 = new THREE.PointLight(0xffa050, 0.0, 3.5, 2); root.add(spill2);
@@ -160,7 +161,7 @@ export function buildMachines(stage, app) {
       for (const sp of ctx.spin) { const s = state[sp.id]; sp.obj.rotation.y += dt * sp.w * Math.max(0, 1 - s.cur * 4) * (s.on ? 1 : 0); }
       // luzes
       const f1 = state.forno1;
-      inner.intensity = f1.on ? 0.8 + f1.cur * 0.3 : 0.05;
+      inner.intensity = f1.on ? 1.6 + f1.cur * 0.4 : 0.05;
       spill1.intensity = f1.on ? 0.25 + f1.cur * 5 * (0.94 + 0.06 * Math.sin(t * 13) * Math.sin(t * 7.3)) : 0;
       let best = null, bv = 0; for (const o of OVENS) if (o.id !== 'forno1' && state[o.id].cur > bv) { bv = state[o.id].cur; best = o; }
       if (best && bv > 0.02) { const d = best.doors[Math.floor(best.doors.length / 2)]; spill2.position.set(best.x + d.cx, d.y0 + d.h * 0.6, HALL.z0 + best.d + 0.25); spill2.intensity = 0.6 + bv * 5; }
@@ -191,7 +192,7 @@ function makeSteam(root) {
       uniform float scale; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); gl_Position = projectionMatrix * mv; gl_PointSize = aSize * scale / -mv.z; vA = aAlpha; vR = aRot; }`,
     fragmentShader: `uniform sampler2D map; varying float vA; varying float vR;
       void main(){ vec2 p = gl_PointCoord - 0.5; float c = cos(vR), s = sin(vR); p = mat2(c,-s,s,c) * p; vec4 t = texture2D(map, p + 0.5);
-        float a = t.a * vA; if (!(a > 0.003)) discard; gl_FragColor = vec4(vec3(0.86,0.85,0.82) * 0.8, clamp(a, 0.0, 1.0)); }`,
+        float a = t.a * vA; if (!(a > 0.003)) discard; gl_FragColor = vec4(vec3(0.95,0.95,0.93) * 1.1, clamp(a, 0.0, 1.0)); }`,
     transparent: true, depthWrite: false,
   });
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 5; pts.userData.noAO = true; pts.userData.noBloom = true; root.add(pts);

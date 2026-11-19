@@ -70,7 +70,7 @@ uniform sampler2D tColor; uniform sampler2D tDepth; uniform sampler2D tAO; unifo
 uniform vec2 res; uniform vec2 halfTexel; uniform float aoAmt; uniform float useAO; uniform float useMask; uniform float useSSR; uniform float ssrAmt;
 uniform float fogDens; uniform float fogK; uniform vec3 fogCool; uniform vec3 fogWarm; uniform vec3 warmPos;
 uniform float time; uniform float hazeAmt; uniform float fpx; uniform int hazeN; uniform int dbg;
-uniform vec4 hOpen[${MAXH}]; uniform vec3 glassCol; uniform vec3 ledCol; uniform float floorRefl; uniform vec4 ledRows; uniform float ledCols[6]; uniform vec2 gridO;
+uniform vec4 hOpen[${MAXH}]; uniform vec3 glassCol; uniform vec3 ledCol; uniform float floorRefl; uniform vec4 ledRows; uniform float ledCols[6]; uniform vec2 gridO; uniform float roomOn; uniform vec4 roomBox; uniform float roomH;
 uniform vec3 hMin[${MAXH}]; uniform vec3 hMax[${MAXH}]; uniform vec4 hP[${MAXH}]; // x = intensidade, y = z da frente, z = topo da abertura, w = base
 varying vec2 vUv;
 // densidade relativa do desvio (gradiente do índice de refração) do penacho de ar quente que sai pela parte de cima da
@@ -85,8 +85,21 @@ float plume(vec3 p, vec3 bmin, vec3 bmax, vec4 P){
   float sz = 0.08 + 0.14 * clamp(dy / 0.9, 0.0, 1.0);
   float zz = (dz - zc) / sz; float pl = exp(-zz * zz) * step(0.0, dz);
   // mais forte nos primeiros ~0,4 m acima da boca (ar mais quente, gradiente maior), depois mistura e enfraquece
-  float lip = 1.0 + 2.2 * smoothstep(-0.2 * h, 0.0, dy) * (1.0 - smoothstep(0.05, 0.4, dy));
+  float lip = 1.0 + 4.0 * smoothstep(-0.2 * h, 0.0, dy) * (1.0 - smoothstep(0.05, 0.4, dy));
   return sx * max(inside, yw * pl * lip);
+}
+// sombreamento de escala de sala (só a sala de fornos): AO das arestas forro-parede, cantos verticais e piso-parede;
+// poças de luz no piso sob os painéis; nas paredes, vieiras abaixo dos painéis próximos e decaimento junto ao forro
+float roomShade(vec3 p){
+  float dx = min(p.x - roomBox.x, roomBox.y - p.x), dz = min(p.z - roomBox.z, roomBox.w - p.z), dW = min(dx, dz);
+  float dC = roomH - p.y, dF = max(p.y, 0.0);
+  float k = (1.0 - 0.30 * exp(-(dC + dW) / 0.7)) * (1.0 - 0.24 * exp(-(dx + dz) / 0.6)) * (1.0 - 0.2 * exp(-(dF + dW) / 0.2));
+  float near = 0.0;
+  for (int r = 0; r < 4; r++) for (int c = 0; c < 6; c++) { vec2 q = p.xz - vec2(ledCols[c], ledRows[r]); near += exp(-dot(q, q) / 2.6); }
+  if (dW < 0.03) { k *= mix(1.0, 0.74, smoothstep(2.0, 3.98, p.y)) * (0.86 + 0.22 * min(near, 1.2) * smoothstep(3.9, 1.6, p.y)); }
+  else if (p.y < 0.006) { k *= 0.86 + 0.15 * min(near, 1.4); }
+  else if (dC < 0.02) { k *= 0.9 + 0.1 * min(near, 1.0); }
+  return k;
 }
 void main(){
   float d = texture2D(tDepth, vUv).x;
@@ -155,18 +168,20 @@ void main(){
       float m = smoothstep(x0 - b, x0 + b, q.x) * (1.0 - smoothstep(x1 - b, x1 + b, q.x)) * smoothstep(P.w - b, P.w + b, q.y) * (1.0 - smoothstep(P.z - b, P.z + b, q.y));
       em += glassCol * m * (1.0 + 2.5 * hOpen[i].x);
     }
-    if (r.y > 0.05) {
-      float t = (${(HALL_H - 0.006).toFixed(3)} - wp.y) / r.y; vec3 q = wp + r * t; float b = 0.01 + t * 0.05;
-      for (int k = 0; k < 4; k++) {
-        float dz = abs(q.z - ledRows[k]); if (dz > 0.31 + b) continue;
-        float mz = 1.0 - smoothstep(0.3125 - b, 0.3125 + b, dz);
-        for (int c = 0; c < 6; c++) { float dx = abs(q.x - ledCols[c]); em += ledCol * mz * (1.0 - smoothstep(0.625 - b, 0.625 + b, dx)); }
+    if (r.y > 0.05) { // painéis LED: reflexo borrado e alongado na direção do olhar (vertical na tela), como em piso acetinado
+      float t = (${(HALL_H - 0.006).toFixed(3)} - wp.y) / r.y; vec3 q = wp + r * t;
+      vec2 dl = normalize(r.xz + 1e-5), dp = vec2(-dl.y, dl.x); float sa = 0.55 + t * 0.32, sl = 0.42 + t * 0.05; vec3 el = vec3(0.0);
+      for (int k = 0; k < 4; k++) for (int c = 0; c < 6; c++) {
+        vec2 v = q.xz - vec2(ledCols[c], ledRows[k]); float a1 = dot(v, dl) / sa, a2 = dot(v, dp) / sl;
+        el += ledCol * exp(-a1 * a1 - a2 * a2);
       }
+      em += el;
     }
-    col += em * F * floorRefl * grout;
+    col += em * F * floorRefl * mix(0.55, 1.0, grout);
     if (dbg == 2) { gl_FragColor = vec4(s.rgb * F * ssrAmt * grout * 4.0, dist); return; }
   }
   if (dbg == 3) { gl_FragColor = vec4(abs(hz) * hazeAmt * fpx * 0.5, 0.0, dist); return; }
+  if (roomOn > 0.5 && d < 1.0) col *= roomShade(wp);
   // névoa leve (vapor/ar úmido; um pouco mais densa no alto e mais quente perto dos fornos)
   float L = min(dist, 60.0);
   float ry = rd.y * fogK; float base = fogDens * exp(fogK * (camPos.y - 1.5));
@@ -330,10 +345,11 @@ class MainPass extends Pass {
       hMin: { value: pad(this.hazeSrc, (h) => (h ? h.min : new THREE.Vector3())) }, hMax: { value: pad(this.hazeSrc, (h) => (h ? h.max : new THREE.Vector3())) },
       hP: { value: pad(this.hazeSrc, (h) => (h ? h.p : new THREE.Vector4())) },
       hOpen: { value: pad(this.hazeSrc, (h) => (h ? (h.open = new THREE.Vector4()) : new THREE.Vector4())) },
-      glassCol: { value: new THREE.Vector3(3.2, 1.5, 0.5) }, ledCol: { value: new THREE.Vector3(5.0, 4.85, 4.6) }, floorRefl: { value: P.floorRefl ?? 1 },
+      glassCol: { value: new THREE.Vector3(3.2, 1.5, 0.5) }, ledCol: { value: new THREE.Vector3(1.5, 1.45, 1.36) }, floorRefl: { value: P.floorRefl ?? 1 },
       // centro de cada PAR de painéis (borda comum entre as duas células), fileiras ajustadas à grade de 625 mm
       ledRows: { value: new THREE.Vector4(...HC.ledRows.map((z) => snapC(z, HC.z0))) },
       ledCols: { value: HC.ledCols.map((x) => snapC(x - 0.3125, HC.x0) + 0.3125) },
+      roomOn: { value: 1 }, roomBox: { value: new THREE.Vector4(HC.x0, HC.x1, HC.z0, HC.z1) }, roomH: { value: HC.h },
     }));
     this.dof = mat(DOF_FRAG, { tSrc: { value: this.aRT.texture }, texel: { value: new THREE.Vector2() }, focus: { value: 2 }, amount: { value: 0 }, maxR: { value: 14 }, nearK: { value: 0.5 } });
     this.pre = mat(BLOOM_PRE, { tSrc: { value: this.aRT.texture }, tMask: { value: this.maskRT.texture }, texel: { value: new THREE.Vector2() }, thr: { value: P.bloomThr }, knee: { value: 1.5 }, useMask: { value: 0 } });
@@ -424,7 +440,7 @@ vD = length(mvPosition.xyz); }`,
       let open = 0; try { open = app?.machines?.doorOpen?.(h.id) ?? app?.field?.doors?.[h.id] ?? 0; } catch { open = 0; }
       open = Math.max(0, Math.min(1, +open || 0)); h.p.x = open * h.k; h.open.x = open; anyHaze += h.p.x;
     }
-    A.hazeAmt.value = anyHaze > 0 ? 0.06 * (P.haze ?? 1) : 0; A.floorRefl.value = this.stage.env === 'caldeiras' ? 0 : (P.floorRefl ?? 1);
+    A.hazeAmt.value = anyHaze > 0 ? 0.1 * (P.haze ?? 1) : 0; A.floorRefl.value = this.stage.env === 'caldeiras' ? 0 : (P.floorRefl ?? 1); A.roomOn.value = this.stage.env === 'caldeiras' ? 0 : (P.room ?? 1);
     this.run(this.composeA, this.aRT);
     // 6) DOF
     const dof = this.stage._dof; const B = this.composeB.uniforms;

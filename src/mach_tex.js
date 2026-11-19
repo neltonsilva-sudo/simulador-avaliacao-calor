@@ -145,10 +145,10 @@ export function cavityTexture(seed, { lamps = [[0.5, 0.12]], tint = [1, 0.34, 0.
   // âmbar 2700 K: base saturada, gradiente vertical (topo/lâmpadas mais quentes e claros), núcleo branco-amarelado nas lâmpadas.
   // Codificado em LDR (0..1); a intensidade HDR vem do material (× 3–5).
   const N = 256, c = canvas(N), x = c.getContext('2d'), img = x.createImageData(N, N), d = img.data;
-  const n = fbm(N, N, 4, 4, 4, seed), st = fbm(N, N, 64, 2, 2, seed + 5);
+  const n = fbm(N, N, 4, 4, 4, seed);
   for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
     const u = px / N, v = py / N, i = py * N + px;
-    let L = (0.32 + 0.1 * n[i] + 0.03 * (st[i] - 0.5)) * (1 - grad + grad * (1 - v) * 1.25);
+    let L = (0.32 + 0.08 * n[i]) * (1 - grad + grad * (1 - v) * 1.25);
     let H = 0;
     for (const [lx, ly, s2 = 1] of lamps) { const dd = Math.hypot((u - lx) * 1.3, v - ly); H += s2 * (0.9 * Math.exp(-dd * dd / 0.004) + 0.25 * Math.exp(-dd * dd / 0.03)); L += s2 * 0.35 * Math.exp(-dd * dd / 0.08); }
     const edge = Math.min(u, 1 - u, v, 1 - v), e = dark + (1 - dark) * sst(0, 0.16, edge); L *= e; H *= e;
@@ -159,7 +159,7 @@ export function cavityTexture(seed, { lamps = [[0.5, 0.12]], tint = [1, 0.34, 0.
   x.putImageData(img, 0, 0); return tex(c, true, false);
 }
 /** reflexo no vidro (aditivo): faixas de luminária, véu de gordura/digitais e, opcional, fileira de pontos das lâmpadas internas */
-export function glassFxTexture(seed, { dots = 0, dotRows = 1, bands = 2 } = {}) {
+export function glassFxTexture(seed, { dots = 0, dotRows = 1, bands = 2, haze: hz = 1 } = {}) {
   const W = 512, H = 256, c = canvas(W, H), x = c.getContext('2d'), r = rng(seed);
   x.fillStyle = '#000'; x.fillRect(0, 0, W, H);
   // faixas diagonais suaves (luminárias do teto refletidas)
@@ -172,7 +172,7 @@ export function glassFxTexture(seed, { dots = 0, dotRows = 1, bands = 2 } = {}) 
   const n = fbm(W, H, 6, 3, 4, seed + 3), img = x.getImageData(0, 0, W, H), dd = img.data;
   for (let yy = 0; yy < H; yy++) for (let xx = 0; xx < W; xx++) {
     const i = yy * W + xx, v = yy / H, edge = Math.min(xx / W, 1 - xx / W, v, 1 - v);
-    const haze = (0.05 + 0.1 * sst(0.5, 1, v) + 0.08 * (1 - sst(0, 0.08, edge))) * (0.6 + 0.8 * n[i]);
+    const haze = hz * (0.05 + 0.1 * sst(0.5, 1, v) + 0.08 * (1 - sst(0, 0.08, edge))) * (0.6 + 0.8 * n[i]);
     dd[i * 4] = Math.min(255, dd[i * 4] + haze * 150); dd[i * 4 + 1] = Math.min(255, dd[i * 4 + 1] + haze * 145); dd[i * 4 + 2] = Math.min(255, dd[i * 4 + 2] + haze * 135);
   }
   x.putImageData(img, 0, 0);

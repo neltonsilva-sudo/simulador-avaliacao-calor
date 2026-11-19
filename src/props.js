@@ -424,7 +424,10 @@ export function buildProps(stage, app) {
     return true;
   }
   let nDecal = 0;
-  for (const o of OVENS) {
+  // Desligado (2026-11-19): os decalques ficavam presos às malhas mescladas dos fornos e viravam manchas marrons
+  // horizontais nas coifas/frentes e riscos dentro do vidro. ?fuligem=1 reativa para testes.
+  const FULIGEM = new URLSearchParams(location.search).get('fuligem') === '1';
+  for (const o of FULIGEM ? OVENS : []) {
     const fz = ovenFrontZ(o);
     for (const d of o.doors) {
       const cx = o.x + d.cx;

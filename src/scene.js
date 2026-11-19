@@ -10,7 +10,7 @@ import { CAMS, PRESENT, PRESENT2, HALL, HALL2 } from './layout_cams.js';
 import { OVENS, ovenFrontZ } from './layout.js';
 import { createPost } from './scene_post.js';
 
-const K4000 = new THREE.Color(1.0, 0.965, 0.92); // 4000 K após o balanço de branco da câmera (neutro, levemente quente)
+const K4000 = new THREE.Color(1.0, 0.95, 0.885); // 4000 K após o balanço de branco da câmera (neutro, levemente quente)
 
 // IBL provisório (antes da captura da sala real): caixa com azulejo claro, fileiras de luminárias e o brilho dos fornos
 function buildEnvScene() {
@@ -83,8 +83,8 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     quality, ao: quality === 'low' ? 0 : 1.0, aoRadius: 0.28,
     fogDens: 0.0025, fogK: 0.18, fogCool: new THREE.Vector3(0.11, 0.11, 0.105), fogWarm: new THREE.Vector3(0.24, 0.16, 0.09), ovenGlow: 8.0,
     ssr: quality === "low" ? 0 : 1.2, floorRefl: 2.0, warmPos: new THREE.Vector3(3.5, 1.8, -4.6), haze: quality === 'low' ? 0.6 : 1.0,
-    bloomThr: 1.1, bloom: 0.34, exposure: 0.74, ca: 0.3, vignette: 0.22, sat: 0.98, contrast: 0.22,
-    lift: new THREE.Vector3(0.0, 0.0, 0.0), gain: new THREE.Vector3(0.012, 0.005, -0.008),
+    bloomThr: 1.1, bloom: 0.34, exposure: 0.8, ca: 0.15, vignette: 0.22, sat: 1.05, contrast: 0.22, room: 1,
+    lift: new THREE.Vector3(0.0, 0.0, 0.0), gain: new THREE.Vector3(0.02, 0.008, -0.012),
     grain: 0.014, smaa: true, dofMax: 22, dofNear: 0.4, tonemap: qs.get('tmo') || 'hp',
   };
   const stage = { THREE, renderer, scene, camera, controls, canvas, quality, P, app, hallBounds: HALL, bounds: { ...HALL }, lightRig, key, hemi, rows, _dof: { amount: 0, dist: 2, target: null, want: 0 } };
@@ -119,7 +119,8 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     fragmentShader: 'uniform samplerCube tCube; varying vec3 vDir; void main(){ vec3 c = textureCube(tCube, vDir).rgb; if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0); gl_FragColor = vec4(clamp(c, 0.0, 400.0), 1.0); }',
   })));
   let envT = -1, envI = 0.3; // segundos até a próxima captura; intensidade do IBL capturado
-  if (app?.on) app.on('ready', () => { envT = 0.3; setTimeout(() => (envT = 0.05), 2600); });
+  const envChain = (d = 0.3) => { envT = d; for (const ms of [1300, 2600, 4200]) setTimeout(() => (envT = 0.05), ms + d * 1000); }; // capturas encadeadas: cada uma já vê o inox iluminado pela anterior
+  if (app?.on) app.on('ready', () => envChain(0.3));
   else setTimeout(() => (envT = 0.05), 1500);
 
   // ── tamanho + resolução dinâmica ──
@@ -239,9 +240,9 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   // fornos: luzes do palco (fileiras LED + chave com sombra). caldeiras: o grupo do agente CALDEIRAS traz as luzes dele; o palco
   // só reposiciona a chave com sombra (luz do dia vinda do alto/janelas) sobre o galpão e recaptura o IBL lá dentro.
   const ENVS = {
-    fornos: { bounds: HALL, probe: HALL.probe, rig: true, exposure: 0.74, envI: 0.3, fog: [0.0025, 0.18, [0.11, 0.11, 0.105], [0.24, 0.16, 0.09]], warm: [3.5, 1.8, -4.6],
+    fornos: { bounds: HALL, probe: HALL.probe, rig: true, exposure: 0.8, envI: 0.3, fog: [0.0025, 0.18, [0.11, 0.11, 0.105], [0.24, 0.16, 0.09]], warm: [3.5, 1.8, -4.6],
       key: { pos: [1.8, 14, 5.5], target: [0.4, 0, -0.5], box: [-11, 11, 9, -9], near: 4, far: 26, i: 0.4, color: K4000 } },
-    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 1.0, envI: 0.5, fog: [0.011, 0.04, [0.50, 0.52, 0.54], [0.56, 0.54, 0.50]], warm: [40, 2.2, -3],
+    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 0.95, envI: 0.75, fog: [0.004, 0.03, [0.42, 0.44, 0.46], [0.48, 0.46, 0.43]], warm: [40, 2.2, -3],
       key: { pos: [49, 30, 14], target: [43, 0, 0], box: [-17, 17, 14, -14], near: 8, far: 60, i: 0.55, color: new THREE.Color(1.0, 0.98, 0.95) } },
   };
   stage.env = 'fornos';
@@ -252,7 +253,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     Object.assign(key.shadow.camera, { left: E.key.box[0], right: E.key.box[1], top: E.key.box[2], bottom: E.key.box[3], near: E.key.near, far: E.key.far });
     key.shadow.camera.updateProjectionMatrix(); key.target.updateMatrixWorld();
     P.exposure = E.exposure; P.fogDens = E.fog[0]; P.fogK = E.fog[1]; P.fogCool.set(...E.fog[2]); P.fogWarm.set(...E.fog[3]); P.warmPos.set(...E.warm);
-    cubeCam.position.set(...E.probe); envI = E.envI; envT = 0.05; setTimeout(() => (envT = 0.05), 1800);
+    cubeCam.position.set(...E.probe); envI = E.envI; envChain(0.4);
   }
 
   Object.assign(stage, {

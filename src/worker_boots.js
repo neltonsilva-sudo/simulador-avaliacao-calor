@@ -115,19 +115,21 @@ function laceGeo() {
   return { lace, eyelets: mergeGeometries(ep) };
 }
 
+export const BOOT_U = { uBootCol: { value: new THREE.Color(0.011, 0.010, 0.0095) } };
 function leatherMat() {
   const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0, clearcoat: 0.12, clearcoatRoughness: 0.45, specularIntensity: 0.6 });
   m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, BOOT_U);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vB;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvB = position;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vB;
+      varying vec3 vB; uniform vec3 uBootCol;
       float h31(vec3 p){p=fract(p*0.1031);p+=dot(p,p.yzx+33.33);return fract((p.x+p.y)*p.z);}
       float vn(vec3 p){vec3 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
         return mix(mix(mix(h31(i),h31(i+vec3(1,0,0)),f.x),mix(h31(i+vec3(0,1,0)),h31(i+vec3(1,1,0)),f.x),f.y),
         mix(mix(h31(i+vec3(0,0,1)),h31(i+vec3(1,0,1)),f.x),mix(h31(i+vec3(0,1,1)),h31(i+vec3(1,1,1)),f.x),f.y),f.z);}
       float bScuff; float bSeam;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 p = vB; vec3 col = vec3(0.011, 0.010, 0.0095) * (0.85 + 0.3 * vn(p * 900.0));
+      { vec3 p = vB; vec3 col = uBootCol * (0.85 + 0.3 * vn(p * 900.0));
         // biqueiro: costura em arco atravessando o bico (pesponto duplo)
         float cap = p.z - (0.118 + 0.035 * pow(abs(p.x) / 0.055, 2.0));
         float st = smoothstep(0.0011, 0.0003, abs(cap)) + smoothstep(0.0011, 0.0003, abs(cap - 0.0045));

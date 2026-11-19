@@ -37,7 +37,7 @@ export function buildEquipment(ctx) {
     // flange da porta (anel) + porta abaulada (calota) com parafusos
     batch.add('steelHot', new THREE.CylinderGeometry(R - 0.01, R - 0.01, 0.07, 96), G.mat4([cx, cy, zb + 0.155], [Math.PI / 2, 0, 0]));
     const a = R - 0.07, hcap = 0.15, Rs = (a * a + hcap * hcap) / (2 * hcap), th = Math.asin(a / Rs);
-    const capG = new THREE.SphereGeometry(Rs, 96, 10, 0, Math.PI * 2, 0, th); { const P = capG.attributes.position, uv = capG.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / 1.2, P.getZ(i) / 1.2); }
+    const capG = new THREE.SphereGeometry(Rs, 96, 10, 0, Math.PI * 2, 0, th); { const P = capG.attributes.position, uv = capG.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / (2 * a) + 0.5, P.getZ(i) / (2 * a) + 0.5); }
     const zDoorBase = zb + 0.19;
     batch.add('door', capG, G.mat4([cx, cy, zDoorBase + hcap - Rs], [Math.PI / 2, 0, 0]));
     const doorZ = (r) => zDoorBase + hcap - (Rs - Math.sqrt(Math.max(0, Rs * Rs - r * r))); // superfície da porta no raio r
@@ -99,7 +99,7 @@ export function buildEquipment(ctx) {
     cyl('steel', V(mpx, top - 0.02, mpz), V(mpx, top + 0.18, mpz), 0.022, 12);
     batch.add('steel', G.cached('pigtail', () => { const t = new THREE.TorusGeometry(0.05, 0.009, 8, 24, Math.PI * 1.8); return t; }), G.mat4([mpx, top + 0.24, mpz]));
     cyl('steel', V(mpx, top + 0.28, mpz), V(mpx, top + 0.42, mpz), 0.01, 8); cyl('cast', V(mpx, top + 0.33, mpz), V(mpx, top + 0.37, mpz), 0.022);
-    const g1 = G.gauge(group, batch, M, faceP.tex, gp, Z, 0.085); needles.push({ n: g1.needle, ang: faceP.ang, v: 9.6, jit: 0.06, seed: num * 1.7 });
+    const g1 = G.gauge(group, batch, M, faceP.tex, gp, Z, 0.1); needles.push({ n: g1.needle, ang: faceP.ang, v: 9.6, jit: 0.06, seed: num * 1.7 });
     for (const dx of [-0.35, -0.6]) { cyl('steel', V(cx + dx, top - 0.02, mpz), V(cx + dx, top + 0.25, mpz), 0.018, 10); box('paintDark', [cx + dx, top + 0.33, mpz], [0.1, 0.14, 0.09]); }
     // ───── válvula principal de vapor (topo, z = saída) + saída vertical ─────
     const sp = PIPES.find((p) => p.id === (num === 1 ? 'saida1' : 'saida2')); const zs = sp.c[2];
@@ -165,6 +165,43 @@ export function buildEquipment(ctx) {
     sign('quente', V(cx - 0.62, cy + 0.85, doorZ(0.95) + 0.03), V(0, 0.12, 1), 0.2);
     // ───── painel de comando (gabinete cinza com IHM) à esquerda da frente ─────
     panel(ctx, V(cx - 1.95, 0, zf + 0.42), 0, `CALDEIRA ${num}`, num);
+  }
+
+  // ═════════════ BARRILETE DE INOX (sem isolamento) com pescoços de ganso sobre as caldeiras (FOTOS 1 e 5) ═════════════
+  {
+    const hy = 4.6, hz = -2.6, hr = 0.14, top = BOILERS[0].c[1] + BOILERS[0].R;
+    pipe('steel', [V(36.5, top - 0.05, hz), V(36.5, hy, hz), V(49.05, hy, hz)], hr, 0.62);
+    pipe('steel', [V(42.5, top - 0.05, hz), V(42.5, hy - 0.05, hz)], hr);
+    batch.add('steel', G.cached('teeBall', () => new THREE.SphereGeometry(hr * 1.06, 24, 16)), G.mat4([42.5, hy, hz]));
+    for (const cx of [36.5, 42.5]) {
+      G.flange(batch, inst, 'steel', M.nut, V(cx, top + 0.12, hz), Y, hr, { bolts: 12, thick: 0.035 });
+      G.valve(batch, inst, M, V(cx, top + 0.62, hz), Y, X, hr, { wheel: 'red', size: 1.25, gate: true });
+      G.flange(batch, inst, 'steel', M.nut, V(cx, 3.75, hz), Y, hr, { bolts: 12, thick: 0.035 });
+      // manômetro grande (Ø 200 mm) no pescoço, voltado para a frente
+      cyl('steel', V(cx, 4.05, hz), V(cx, 4.05, hz + hr + 0.12), 0.016, 10);
+      const gg = G.gauge(group, batch, M, faceP.tex, V(cx, 4.05, hz + hr + 0.17), Z, 0.12); needles.push({ n: gg.needle, ang: faceP.ang, v: 9.5, jit: 0.05, seed: cx });
+    }
+    for (const x of [39.5, 45.6]) G.flange(batch, inst, 'steel', M.nut, V(x, hy, hz), X, hr, { bolts: 12, thick: 0.035 });
+    for (const x of [38.6, 41.0, 44.2, 47.4]) { cyl('steelDark', V(x, hy + hr + 0.02, hz), V(x, ctx.TRUSS_Y, hz), 0.012, 8); batch.add('steelDark', G.cached('clampH', () => new THREE.TorusGeometry(0.155, 0.014, 6, 28)), G.mat4([x, hy, hz], [0, Math.PI / 2, 0])); }
+  }
+
+  // ═════════════ RACK DE TUBULAÇÃO junto ao fundo (inox nu + isolada) e vaso de flash entre as caldeiras ═════════════
+  {
+    const ry = 6.72, runs = [[-8.62, 0.12, 'steel'], [-8.98, 0.09, 'steel'], [-9.3, 0.15, 'clad']];
+    for (const [z, r, k] of runs) pipe(k, [V(30.3, ry, z), V(55.7, ry, z)], r);
+    for (const x of [33.25, 36.5, 39.75, 43, 46.25, 49.5, 52.75]) { box('struct', [x, ry - 0.2, -9.0], [0.12, 0.12, 1.25]); if ([36.5, 43, 49.5].includes(x)) box('struct', [x, ry - 0.55, -9.55], [0.12, 0.6, 0.12]); else cyl('steelDark', V(x, ry - 0.14, -9.0), V(x, ctx.TRUSS_Y, -9.0), 0.014, 8); }
+    for (const x of [34.5, 40.8, 47.1, 53.4]) for (const [z, r, k] of runs) if (k === 'steel') G.flange(batch, inst, 'steel', M.nut, V(x, ry, z), X, r, { bolts: 8 });
+    // descidas de inox com curvas grandes: rack → vaso de flash (entre as caldeiras) e rack → processo (parede esquerda)
+    pipe('steel', [V(38.9, ry, -8.62), V(38.9, ry - 0.9, -8.62), V(38.9, ry - 0.9, -7.2), V(38.9, 2.3, -7.2), V(39.3, 2.3, -7.2)], 0.1, 0.5);
+    pipe('steel', [V(31.2, ry, -8.98), V(31.2, 3.0, -8.98), V(31.2, 3.0, -7.0), V(30.3, 3.0, -7.0)], 0.09, 0.45);
+    const fx = 39.6, fz = -7.2;
+    batch.add('steel', G.shellGeo(0.38, 1.1, { top: 'ell', bot: 'ell', seg: 48, sheetW: 0.6, sheetL: 1.0 }), G.mat4([fx, 0.5 + 0.19 + 0.55, fz]));
+    for (let k = 0; k < 3; k++) { const a = k * 2.094 + 0.5; cyl('paintBlue', V(fx + Math.cos(a) * 0.3, 0, fz + Math.sin(a) * 0.3), V(fx + Math.cos(a) * 0.3, 0.62, fz + Math.sin(a) * 0.3), 0.035, 10); }
+    cyl('steel', V(fx, 1.9, fz), V(fx, 3.35, fz), 0.07, 18); G.flange(batch, inst, 'steel', M.nut, V(fx, 2.05, fz), Y, 0.07, { bolts: 6 });
+    cyl('steel', V(fx, 3.35, fz), V(fx, 3.42, fz), 0.085, 18);
+    const gf = G.gauge(group, batch, M, TX.gaugeFace({ max: 4, red: 1.5, unit: 'kgf/cm²' }).tex, V(fx + 0.38, 1.35, fz + 0.12), V(0.6, 0, 0.8).normalize(), 0.08); needles.push({ n: gf.needle, ang: (v) => -(Math.PI * 0.75 + Math.PI * 1.5 * v / 4), v: 0.4, jit: 0.02, seed: 5.5 });
+    ctx.emitters.flash = { pos: V(fx, 3.44, fz), dir: Y.clone() };
+    ctx.sign('quente', V(fx, 1.2, fz + 0.385), V(0, 0, 1), 0.2);
   }
 
   // ═════════════ LINHA AÉREA ISOLADA (aerea) + descida ao coletor ═════════════

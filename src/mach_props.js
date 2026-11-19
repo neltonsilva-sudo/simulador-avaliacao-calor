@@ -72,7 +72,8 @@ export function buildProps(ctx) {
     B.box('whitePlastic', bx - 0.32, h + 0.018, bz + 0.22, bx - 0.2, h + 0.022, bz + 0.31, 0.002, 1);
     B.box('steelPol', bx + 0.5, h, bz + 0.15, bx + 0.78, h + 0.06, bz + 0.33, 0.01); B.box('blackGloss', bx + 0.58, h + 0.04, bz + 0.331, bx + 0.7, h + 0.055, bz + 0.334, 0.001, 1);
     // sacos de farinha na prateleira
-    for (let i = 0; i < 3; i++) B.box('flour', bx - 1.0 + i * 0.5, 0.2, bz - 0.25, bx - 0.6 + i * 0.5, 0.33, bz + 0.25, 0.05, 3);
+    { const sg = sackGeometry(), sm = sackMat();
+      for (let i = 0; i < 3; i++) { const m = new THREE.Mesh(sg, sm); m.position.set(bx - 0.8 + i * 0.5, 0.2, bz + jit(0.03)); m.rotation.y = Math.PI / 2 + jit(0.08); m.castShadow = m.receiveShadow = true; g.add(m); } }
     // lixeira com pedal ao lado da bancada
     bin(B, bx - w / 2 - 0.35, bz - 0.15, 'greyPlastic');
   }
@@ -298,3 +299,29 @@ function formTex() {
   return T.tex(c, true, false);
 }
 export function setExtMats(M) { extMats = M; }
+/** saco de farinha 25 kg (papel kraft multifoliado): topo achatado, pontas afuniladas, costura, impressão genérica sem marca */
+let _sack = null, _sackM = null;
+function sackGeometry() {
+  if (_sack) return _sack;
+  const L = 0.62, W = 0.4, H = 0.13, g = new THREE.BoxGeometry(1, 1, 1, 16, 4, 10), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) {
+    let x = P.getX(i), y = P.getY(i) + 0.5, z = P.getZ(i);       // x ∈ ±0,5 (comprimento), y ∈ 0..1
+    const e = Math.abs(2 * x), pinch = 1 - 0.38 * Math.pow(e, 5), drop = 1 - 0.45 * Math.pow(e, 4);
+    const puff = 1 + 0.12 * (1 - Math.pow(2 * y - 1, 2));
+    z *= pinch * puff; y = Math.pow(y, 0.85) * drop;
+    y += 0.03 * Math.sin(x * 9 + z * 5) * y;                      // amassados
+    P.setXYZ(i, x * L, y * H, z * W);
+  }
+  g.computeVertexNormals(); return (_sack = g);
+}
+function sackMat() {
+  if (_sackM) return _sackM;
+  const c = T.canvas(512, 256), x = c.getContext('2d');
+  x.fillStyle = '#e9e1cf'; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(150,130,100,${Math.random() * 0.06})`; x.fillRect(Math.random() * 512, Math.random() * 256, 2 + Math.random() * 6, 1); }
+  x.fillStyle = '#2f7d3a'; x.fillRect(0, 40, 512, 18); x.fillRect(0, 198, 512, 18);
+  x.fillStyle = '#7a2a1c'; x.font = '800 44px "Roboto Condensed", Arial'; x.textAlign = 'center'; x.fillText('FARINHA DE TRIGO', 256, 112);
+  x.font = '700 30px "Roboto Condensed", Arial'; x.fillStyle = '#333'; x.fillText('TIPO 1  •  PANIFICAÇÃO', 256, 152); x.fillText('25 kg', 256, 186);
+  x.strokeStyle = 'rgba(90,70,50,0.7)'; x.setLineDash([6, 5]); x.lineWidth = 3; for (const px of [14, 498]) { x.beginPath(); x.moveTo(px, 0); x.lineTo(px, 256); x.stroke(); }
+  return (_sackM = new THREE.MeshStandardMaterial({ map: T.tex(c, true, false), roughness: 0.92 }));
+}

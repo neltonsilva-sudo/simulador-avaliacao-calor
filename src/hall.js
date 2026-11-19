@@ -39,14 +39,18 @@ export function buildHall(stage, app) {
   M.floor = new THREE.MeshStandardMaterial({ map: fl.map, roughnessMap: fl.rough, normalMap: fl.normal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 1, metalness: 0, envMapIntensity: 0.9 });
   M.tile = new THREE.MeshStandardMaterial({ map: tile.map, roughnessMap: tile.rough, normalMap: tile.normal, normalScale: new THREE.Vector2(0.5, 0.5), roughness: 1, metalness: 0, vertexColors: true, envMapIntensity: 1.0 });
   M.paint = new THREE.MeshStandardMaterial({ map: paint.map, roughnessMap: paint.rough, normalMap: paint.normal, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 1, vertexColors: true });
-  M.ceil = new THREE.MeshStandardMaterial({ map: ceil.map, roughnessMap: ceil.rough, normalMap: ceil.normal, roughness: 1, envMapIntensity: 3.2, color: 0xeeeeec, normalScale: new THREE.Vector2(0.6, 0.6) }); // envMapIntensity alto = rebote do piso/paredes claros (IBL capturado da sala)
+  // forro: albedo alto; o rebote do piso e das paredes claras (que a sala de 4 m recebe em peso) entra como emissivo calibrado
+  // (≈65% da luminância das paredes, como na FOTO 5) — o IBL de um ponto só e as luzes voltadas para baixo não o iluminam
+  M.ceil = new THREE.MeshStandardMaterial({ map: ceil.map, roughnessMap: ceil.rough, normalMap: ceil.normal, roughness: 1, envMapIntensity: 1.0, color: 0xf2f2ef,
+    emissive: new THREE.Color(1.0, 0.975, 0.94), emissiveMap: ceil.map, emissiveIntensity: 0.3, normalScale: new THREE.Vector2(0.6, 0.6) });
   M.cove = new THREE.MeshStandardMaterial({ color: 0x9a9993, roughness: 0.45 });
   M.inox = new THREE.MeshStandardMaterial({ color: 0xd2d5d8, metalness: 1, roughness: 0.95, roughnessMap: brushed });
   M.inoxDark = new THREE.MeshStandardMaterial({ color: 0xa4a8ac, metalness: 1, roughness: 1.0, roughnessMap: brushed });
   M.chrome = new THREE.MeshStandardMaterial({ color: 0xe8eaec, metalness: 1, roughness: 0.07 });
-  M.galv = new THREE.MeshStandardMaterial({ color: 0xc4c8cb, metalness: 0.55, roughness: 0.45, envMapIntensity: 2.2 });
+  M.galv = new THREE.MeshStandardMaterial({ color: 0xc9ccce, metalness: 0.35, roughness: 0.5, envMapIntensity: 2.0 });
   M.yellow = new THREE.MeshStandardMaterial({ color: 0xf5c400, roughness: 0.26, metalness: 0 }); // amarelo-segurança (gás, NBR 6493)
   M.alu = new THREE.MeshStandardMaterial({ color: 0xc9ccce, metalness: 0.6, roughness: 0.35, envMapIntensity: 2.0 });
+  M.panelFrame = new THREE.MeshStandardMaterial({ color: 0xf0f0ee, roughness: 0.5, emissive: new THREE.Color(1, 0.98, 0.95), emissiveIntensity: 0.35 }); // moldura branca do painel (pintura eletrostática)
   M.trim = new THREE.MeshStandardMaterial({ color: 0xe4e4e0, roughness: 0.4 }); // perfil de arremate (PVC/alumínio anodizado claro)
   M.dark = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.6 });
   M.drainDark = new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.15 });
@@ -65,7 +69,7 @@ export function buildHall(stage, app) {
   M.crate = new THREE.MeshStandardMaterial({ color: 0x3d6fb3, roughness: 0.55 });
   M.glassPort = new THREE.MeshStandardMaterial({ color: 0x20262a, metalness: 0.2, roughness: 0.05, envMapIntensity: 1.4 });
   const winTex = TX.windowTexture();
-  M.windows = [0.5, 0.62, 0.74].map((k) => new THREE.MeshStandardMaterial({ color: 0xd8dde0, emissive: new THREE.Color(0.9, 0.94, 1.0), emissiveMap: winTex, emissiveIntensity: k, roughness: 0.25, metalness: 0 })); // vidro mini-boreal translúcido
+  M.windows = [0.32, 0.4, 0.48].map((k) => new THREE.MeshStandardMaterial({ color: 0xd8dde0, emissive: new THREE.Color(0.9, 0.94, 1.0), emissiveMap: winTex, emissiveIntensity: k, roughness: 0.25, metalness: 0 })); // vidro mini-boreal translúcido
   M.window = M.windows[1];
   M.sky = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.95, 1.0, 1.08).multiplyScalar(1.3) });
   M.emerg = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, emissive: 0xffffff, emissiveIntensity: 0.0, roughness: 0.5 });
@@ -174,15 +178,15 @@ export function buildHall(stage, app) {
   {
     const g = new THREE.PlaneGeometry(W, D); const uv = g.attributes.uv;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * W, uv.getY(i) * D);
-    const m = new THREE.Mesh(g, M.ceil); m.rotation.x = Math.PI / 2; m.position.set((HALL.x0 + HALL.x1) / 2, HT, (HALL.z0 + HALL.z1) / 2); m.name = 'ceiling'; group.add(m);
+    const m = new THREE.Mesh(g, M.ceil); m.userData.noAO = true; m.rotation.x = Math.PI / 2; m.position.set((HALL.x0 + HALL.x1) / 2, HT, (HALL.z0 + HALL.z1) / 2); m.name = 'ceiling'; group.add(m);
     // luminárias LED embutidas 625×625 (painel opalino em moldura de alumínio) na grade do forro modulado
     const pan = new THREE.PlaneGeometry(0.585, 0.585), fr = box(0.625, 0.012, 0.02), fr2 = box(0.02, 0.012, 0.625);
     const snap = (v, o) => o + 0.3125 + Math.round((v - o - 0.3125) / 0.625) * 0.625; // centro da célula da grade (origem no canto da sala)
     for (const z0 of HC.ledRows) for (const x of HC.ledCols) for (const dx of [-0.3125, 0.3125]) {
       const cx = snap(x + dx, HALL.x0), z = snap(z0, HALL.z0);
       put(M.led, pan, cx, HT - 0.006, z, Math.PI / 2);
-      put(M.alu, fr, cx, HT - 0.006, z - 0.3025); put(M.alu, fr, cx, HT - 0.006, z + 0.3025);
-      put(M.alu, fr2, cx - 0.3025, HT - 0.006, z); put(M.alu, fr2, cx + 0.3025, HT - 0.006, z);
+      put(M.panelFrame, fr, cx, HT - 0.006, z - 0.3025); put(M.panelFrame, fr, cx, HT - 0.006, z + 0.3025);
+      put(M.panelFrame, fr2, cx - 0.3025, HT - 0.006, z); put(M.panelFrame, fr2, cx + 0.3025, HT - 0.006, z);
     }
     // eletroduto que alimenta cada fileira
   }

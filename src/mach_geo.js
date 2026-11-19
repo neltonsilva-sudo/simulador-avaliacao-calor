@@ -116,12 +116,12 @@ function vnoise3(x, y, z) {
 }
 const PAL = {
   baked: { top: col(0.66, 0.36, 0.11), mid: col(0.82, 0.54, 0.22), side: col(0.9, 0.72, 0.42), bot: col(0.52, 0.32, 0.12), cut: col(0.96, 0.84, 0.58) },
-  baking: { top: col(0.9, 0.68, 0.28), mid: col(0.95, 0.79, 0.42), side: col(0.97, 0.86, 0.58), bot: col(0.78, 0.58, 0.3), cut: col(0.99, 0.92, 0.72) },
+  baking: { top: col(0.93, 0.78, 0.44), mid: col(0.96, 0.86, 0.6), side: col(0.97, 0.9, 0.72), bot: col(0.8, 0.64, 0.38), cut: col(0.99, 0.96, 0.86) },
   raw: { top: col(0.93, 0.88, 0.78), mid: col(0.95, 0.9, 0.81), side: col(0.96, 0.92, 0.84), bot: col(0.9, 0.84, 0.74), cut: col(0.98, 0.95, 0.9) },
   rustic: { top: col(0.6, 0.33, 0.1), mid: col(0.8, 0.52, 0.2), side: col(0.9, 0.7, 0.4), bot: col(0.45, 0.27, 0.1), cut: col(0.98, 0.9, 0.66) },
 };
 /** pão redondo (bisnaguinha/brioche) — base achatada, topo abaulado, leve irregularidade */
-export function bunGeometry(pal = 'baked', { r = 0.055, h = 0.048, seed = 1, cross = false } = {}) {
+export function bunGeometry(pal = 'baked', { r = 0.055, h = 0.048, seed = 1, cross = false, slash = false, flour = 0 } = {}) {
   const g = new THREE.SphereGeometry(1, 15, 9), P = g.attributes.position, n = P.count, C = new Float32Array(n * 3), p = PAL[pal];
   for (let i = 0; i < n; i++) {
     let x = P.getX(i), y = P.getY(i), z = P.getZ(i);
@@ -133,6 +133,12 @@ export function bunGeometry(pal = 'baked', { r = 0.055, h = 0.048, seed = 1, cro
     const blot = vnoise3(x * 5 + seed * 3, y * 5, z * 5);
     c = lerpC(c, p.top, (blot - 0.55) * 0.9 * t);
     if (cross && y > 0.3) { const cut = Math.min(Math.abs(x), Math.abs(z)); if (cut < 0.12) { c = lerpC(p.cut, c, cut / 0.12); yy -= (0.12 - cut) * 0.5; } }
+    if (slash && y > 0.35) { // pestana: corte único levemente em S, borda levantada e mais tostada
+      const sd = Math.abs(z * 0.94 - x * 0.34 - 0.06 * Math.sin(x * 4 + seed)), w = 0.085;
+      if (sd < w) { const a = sd / w; c = lerpC(p.cut, c, a * a); yy -= (1 - a) * 0.09; }
+      else if (sd < w * 2) { const a = (sd - w) / w; c = lerpC(p.top, c, 0.35 + 0.65 * a); yy += (1 - a) * 0.035; }
+    }
+    if (flour > 0 && y > 0.45) { const fl = vnoise3(x * 9 + seed * 5, y * 9, z * 9); if (fl > 0.6) c = lerpC(c, col(0.98, 0.97, 0.94), Math.min(0.8, (fl - 0.6) * 3.5 * flour)); }
     P.setXYZ(i, x * r, yy * h, z * r * 0.97);
     C[i * 3] = c.r; C[i * 3 + 1] = c.g; C[i * 3 + 2] = c.b;
   }
@@ -197,15 +203,15 @@ export function makeMaterials(envMap) {
   const st = T.steelTextures(), tr = T.treadTextures();
   const steelBase = (o = {}) => {
     const m = new THREE.MeshPhysicalMaterial({
-      color: 0xc6c8ca, map: st.albedo, roughnessMap: st.rough, roughness: 2.1, metalness: 1, normalMap: st.normal, normalScale: new THREE.Vector2(0.1, 0.1),
+      color: 0xc6c8ca, map: st.albedo, roughnessMap: st.rough, roughness: 1.25, metalness: 1, normalMap: st.normal, normalScale: new THREE.Vector2(0.1, 0.1),
       anisotropy: 0.8, anisotropyRotation: Math.PI / 2, envMap, envMapIntensity: 1.4, ...o,
     });
     m.userData.worldUV = 0.6; return m;
   };
   const M = {
     steel: steelBase(),
-    steelSat: steelBase({ color: 0xa8abae, roughness: 2.6, envMapIntensity: 1.1 }),        // inox mais fosco (frisos, fundo)
-    steelPol: steelBase({ color: 0xd2d4d6, roughness: 0.9, anisotropy: 0.5 }),             // inox polido (puxadores, molduras)
+    steelSat: steelBase({ color: 0xa8abae, roughness: 1.8, envMapIntensity: 1.2 }),        // inox mais fosco (frisos, fundo)
+    steelPol: steelBase({ color: 0xd2d4d6, roughness: 0.6, anisotropy: 0.5 }),             // inox polido (puxadores, molduras)
     steelDark: steelBase({ color: 0x5c5f62, roughness: 2.2, envMapIntensity: 0.6 }),         // inox escurecido pelo calor (interior)
     chrome: new THREE.MeshPhysicalMaterial({ color: 0xe6e7e8, metalness: 1, roughness: 0.07, envMap, envMapIntensity: 1.1 }),
     black: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: 0.55, metalness: 0.1, envMap, envMapIntensity: 0.5 }),
@@ -213,6 +219,7 @@ export function makeMaterials(envMap) {
     blackGloss: new THREE.MeshPhysicalMaterial({ color: 0x050506, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMap, envMapIntensity: 0.9 }),
     rubber: new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 }),
     grille: new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }),
+    grilleHood: new THREE.MeshStandardMaterial({ color: 0x1a1b1c, roughness: 0.8, metalness: 0.4, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
     alu: new THREE.MeshStandardMaterial({ color: 0x9e958a, roughness: 0.42, metalness: 1, envMap, envMapIntensity: 0.7 }),   // esteira de alumínio (escurecida no forno)
     aluNew: new THREE.MeshStandardMaterial({ color: 0xc4c6c6, roughness: 0.32, metalness: 1, envMap, envMapIntensity: 0.9 }),
     tread: new THREE.MeshStandardMaterial({ color: 0xd8d8d6, map: tr.albedo, roughnessMap: tr.rough, normalMap: tr.normal, normalScale: new THREE.Vector2(1, 1), metalness: 1, roughness: 1, envMap, envMapIntensity: 0.9 }),
@@ -229,16 +236,16 @@ export function makeMaterials(envMap) {
     water: new THREE.MeshPhysicalMaterial({ color: 0xbfd8e6, roughness: 0.05, transmission: 0, transparent: true, opacity: 0.55, envMap }),
     // vidro temperado escuro: reflexo somado por inteiro, transmitido atenuado (ONE, ONE_MINUS_SRC_ALPHA)
     glass: new THREE.MeshPhysicalMaterial({
-      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.3, envMap, envMapIntensity: 0.6, specularIntensity: 1,
+      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.3, envMap, envMapIntensity: 0.07, specularIntensity: 1,
       roughnessMap: T.glassGrime(), depthWrite: false, side: THREE.FrontSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
     }),
     glassClear: new THREE.MeshPhysicalMaterial({
-      color: 0x000000, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.12, envMap, envMapIntensity: 1.4, depthWrite: false, side: THREE.FrontSide,
+      color: 0x000000, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.12, envMap, envMapIntensity: 0.25, depthWrite: false, side: THREE.FrontSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
     }),
     glassDark: new THREE.MeshPhysicalMaterial({
-      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.36, envMap, envMapIntensity: 0.8, roughnessMap: T.glassGrime(), depthWrite: false,
+      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.36, envMap, envMapIntensity: 0.3, roughnessMap: T.glassGrime(), depthWrite: false,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
     }),
     // vidro do armário de fermentação (vermelho)
@@ -247,14 +254,14 @@ export function makeMaterials(envMap) {
     redGlow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.12, 0.06) }),
     lamp: new THREE.MeshBasicMaterial({ color: new THREE.Color(9, 6.2, 3.2) }),
   };
-  M.glassDark.userData.noShadow = true; M.glassDark.userData.order = 2; M.glass.userData.noShadow = true; M.glassClear.userData.noShadow = true; M.glassRed.userData.noShadow = true;
+  M.grilleHood.userData.noShadow = true; M.glassDark.userData.noShadow = true; M.glassDark.userData.order = 2; M.glass.userData.noShadow = true; M.glassClear.userData.noShadow = true; M.glassRed.userData.noShadow = true;
   M.glass.userData.order = 2; M.glassClear.userData.order = 2;
   M.lamp.userData.noAO = true;
   const crust = T.crustNormal();
   const bread = (glow) => emissiveFromColor(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.68, normalMap: crust, normalScale: new THREE.Vector2(0.55, 0.55),
     emissive: new THREE.Color(1, 0.6, 0.22), emissiveIntensity: glow }));
   M.breadIn = bread(1.15); M.breadIn.color.setScalar(0.14);
-  M.breadInPale = bread(1.25); M.breadInPale.emissive.setRGB(1, 0.8, 0.42); M.breadInPale.color.setScalar(0.3); M.breadInPale.customProgramCacheKey = () => 'emisVC';   // turbo (FOTO 2): luz halógena mais clara   // dentro: luz da sala bloqueada pelo forno → quase só a luz interna (emissivo âmbar)     // dentro do forno (luz âmbar)
+  M.breadInPale = bread(0.5); M.breadInPale.emissive.setRGB(1, 0.86, 0.6); M.breadInPale.color.setScalar(0.85); M.breadInPale.customProgramCacheKey = () => 'emisVC';   // turbo (FOTO 2): luz halógena mais clara   // dentro: luz da sala bloqueada pelo forno → quase só a luz interna (emissivo âmbar)     // dentro do forno (luz âmbar)
   M.breadOut = bread(0.0);     // fora (carrinhos, bancada)
   M.breadOut.onBeforeCompile = () => {}; M.breadOut.customProgramCacheKey = () => 'breadOut';
   return M;

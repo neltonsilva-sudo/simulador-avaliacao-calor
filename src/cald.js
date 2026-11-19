@@ -22,8 +22,8 @@ function makeMaterials(stage) {
   const paint = (color, rough = 1, o = {}) => std({ color, roughness: rough, roughnessMap: pt.rough, map: pt.map, normalMap: pt.normal, normalScale: N(0.35), metalness: 0.05, ...o });
   const M = {
     clad: std({ color: 0xd9dcdf, metalness: 1, roughness: 0.62, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
-    door: std({ color: 0xcfccc6, metalness: 1, roughness: 0.35, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.12) }),
-    steelHot: std({ color: 0xc4c1bb, metalness: 1, roughness: 0.7, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.35) }),
+    door: std({ color: 0xf2f0ec, metalness: 1, roughness: 1.35, map: TX.spunTextures().map, roughnessMap: TX.spunTextures().rough, normalMap: TX.spunTextures().normal, normalScale: N(0.18) }),
+    steelHot: std({ color: 0xcfccc6, metalness: 1, roughness: 0.95, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.35) }),
     steel: std({ color: 0xc8cacc, metalness: 1, roughness: 0.75, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.3) }),
     steelDark: std({ color: 0x7d8186, metalness: 0.9, roughness: 0.42 }),
     chrome: std({ color: 0xf2f2f2, metalness: 1, roughness: 0.1 }),
@@ -37,7 +37,7 @@ function makeMaterials(stage) {
     paintRed: paint(0xb3221c, 0.8), svRed: paint(0xa81e1a, 0.75), extRed: std({ color: 0xc0201a, roughness: 0.28 }), toolRed: paint(0xb0261f, 0.7),
     wheelRed: paint(0xc3211b, 0.7), wheelBlue: paint(0x1f56b0, 0.7), paintGreen: paint(0x2f7a46, 0.8), paintDark: paint(0x3b4148),
     paintAlu: paint(0xa9abad, 0.9, { metalness: 0.55 }), burner: paint(0x30363d, 0.7), burnerCover: paint(0x59606a, 0.6), motor: paint(0x3d6c9a, 0.7), motorDark: paint(0x23272b),
-    gasRegulator: paint(0x2e3236, 0.8), cabinet: paint(0xc6cac7, 0.7), drumBlue: paint(0x1f4f9a, 0.8), drumBlack: paint(0x1f2124, 0.8),
+    gasRegulator: paint(0x2e3236, 0.8), cabinet: paint(0xd6dad7, 0.65), drumBlue: paint(0x1f4f9a, 0.8), drumBlack: paint(0x1f2124, 0.8),
     wallLow: paint(0x7b8286, 1), wallBlock: paint(0xb4b9b9, 1), wallPanel: std({ color: 0xbcc2c7, map: wl.map, roughnessMap: wl.rough, normalMap: wl.normal, normalScale: N(0.9), roughness: 1, metalness: 0.25 }),
     frame: std({ color: 0x4b5258, metalness: 0.6, roughness: 0.45 }), gateDoor: paint(0xb9c0c5, 0.8), concrete: std({ color: 0x9c9c97, roughness: 0.9, map: pt.map }),
     rubber: std({ color: 0x161718, roughness: 0.75 }), rubberMat: std({ color: 0x222325, roughness: 0.9 }), blackPlastic: std({ color: 0x18191b, roughness: 0.45 }),

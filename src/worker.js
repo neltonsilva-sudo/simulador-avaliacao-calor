@@ -20,17 +20,17 @@ const sat = (x) => Math.max(0, Math.min(255, x));
 
 // ── recoloração do atlas do corpo (coordenadas de imagem normalizadas) ──
 function recolorBody(im, navy = false) {
-  const SHIRT = navy ? [30, 44, 70] : [242, 240, 234]; // camisa: marinho do uniforme (casca sob a malha da F01) ou branca
+  const SHIRT = navy ? [30, 44, 70] : [238, 236, 230]; // camisa: marinho do uniforme (casca sob a malha da F01) ou branca
   const S = 2048, c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.drawImage(im, 0, 0, S, S);
   const d = g.getImageData(0, 0, S, S), p = d.data;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const i = (y * S + x) * 4, u = x / S, v = y / S, r = p[i], gg = p[i + 1], b = p[i + 2], L = lum(r, gg, b);
     const side = u < 0.335 || u > 0.665;
     const skin = r > 120 && r > gg && gg > b && r - b > 35;
-    if (side && v < 0.235 && (u < 0.2 || u > 0.8)) { const k = 4 + L * 0.05; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.08; }            // mãos → luva preta de malha
+    if (side && v < 0.235 && (u < 0.2 || u > 0.8)) { p[i] = sat(r * 0.6); p[i + 1] = sat(gg * 0.45); p[i + 2] = sat(b * 0.37); }      // mãos: pele (luvas no shader)
     else if (side && v >= 0.11 && v < 0.29 && u > 0.13 && u < 0.87) { const k = L * 0.32; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.05; } // cano da bota
     else if (side && v >= 0.27 && v < 0.41) { const k = Math.min(1.0, 0.82 + (L - 40) / 300); p[i] = sat(SHIRT[0] * 0.97 * k); p[i + 1] = sat(SHIRT[1] * 0.97 * k); p[i + 2] = sat(SHIRT[2] * 0.97 * k); } // cinto → camisa por cima
-    else if (side && v >= 0.585 && v < 0.85) { const k = 0.55 + L / 300; p[i] = sat(36 * k); p[i + 1] = sat(40 * k); p[i + 2] = sat(50 * k); } // pernas → calça escura
+    else if (side && v >= 0.585 && v < 0.85) { const k = 0.55 + L / 300; p[i] = sat(SHIRT[0] * 0.8 * k); p[i + 1] = sat(SHIRT[1] * 0.8 * k); p[i + 2] = sat(SHIRT[2] * 0.8 * k); } // pernas → calça escura
     else if (side && v >= 0.85) { const k = L * 0.33; p[i] = k; p[i + 1] = k; p[i + 2] = k * 1.04; }                                  // botas pretas
     else if (skin) { p[i] = sat(r * 0.6); p[i + 1] = sat(gg * 0.45); p[i + 2] = sat(b * 0.37); }                                       // pele do decote
     else { const k = Math.min(1.04, 0.8 + (L - 52) / 260); p[i] = sat(SHIRT[0] * k); p[i + 1] = sat(SHIRT[1] * k); p[i + 2] = sat(SHIRT[2] * k); }   // blusa/saia → camisa
@@ -103,7 +103,7 @@ export async function buildWorker(stage, app) {
     new FBXLoader(mgr).loadAsync(DIR + 'Female_Adult_11.fbx'),
     img('f011_body_color.jpg'), img('f011_body_normal.jpg'), img('f011_body_specular.jpg'),
     img('f011_head_color.jpg'), img('f011_head_normal.jpg'), img('f011_head_specular.jpg'), img('f011_opacity_color.png')]);
-  const group = new THREE.Group(); group.name = 'trabalhadora'; group.rotation.y = Math.PI / 2 - 0.3; // olha +x, pés ~17° abertos para a câmera (peito em 3/4 como na foto)
+  const group = new THREE.Group(); group.name = 'trabalhadora'; group.rotation.y = 0;
   group.scale.setScalar(SC);
   group.add(fbx); stage.scene.add(group);
   let mesh; fbx.traverse((o) => { if (o.isSkinnedMesh) mesh = o; if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -172,10 +172,11 @@ export async function buildWorker(stage, app) {
   const rep = new Set(head?.replaces || []);
 
   // ── materiais ──
-  const armU = { uE: { value: ELB }, uW: { value: WRI }, uTat: { value: tattooTex() }, uUni: { value: uni?.sleeves ? 1 : 0 } };
-  const bodyMat = inject(new THREE.MeshPhysicalMaterial({ map: recolorBody(bodyC, !!uni), normalMap: new THREE.CanvasTexture(bodyN), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: roughFromSpec(bodyS, 0.95),
+  const armU = { uE: { value: ELB }, uW: { value: WRI }, uTat: { value: tattooTex() }, uUni: { value: uni?.sleeves ? 1 : 0 }, uSleeve: { value: new THREE.Vector3(0.016, 0.027, 0.055) }, uGlove: { value: 0 }, uGloveCol: { value: new THREE.Vector3(0.3, 0.2, 0.11) } };
+  const bodyTexN = recolorBody(bodyC, true), bodyTexW = recolorBody(bodyC, false);
+  const bodyMat = inject(new THREE.MeshPhysicalMaterial({ map: bodyTexN, normalMap: new THREE.CanvasTexture(bodyN), normalScale: new THREE.Vector2(0.35, 0.35), roughnessMap: roughFromSpec(bodyS, 0.95),
     roughness: 1, metalness: 0, sheen: 0.18, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8, specularIntensity: 0.4 }), {
-    decl: NOISE + '\nuniform vec3 uE, uW; uniform sampler2D uTat; uniform float uUni;',
+    decl: NOISE + '\nuniform vec3 uE, uW; uniform sampler2D uTat; uniform float uUni, uGlove; uniform vec3 uSleeve, uGloveCol;',
     color: `vec3 pr = vec3(abs(vRest.x), vRest.y, vRest.z); vec3 ax = uW - uE; float s = dot(pr - uE, ax) / dot(ax, ax);
       vec3 rad = pr - (uE + ax * s); float dd = length(rad);
       float wShirt = 0.0;
@@ -188,9 +189,10 @@ export async function buildWorker(stage, app) {
           vec2 tu = vec2((s - 0.48) / 0.42, 0.5 + ang / 0.9);
           if (tu.y > 0.0 && tu.y < 1.0) sk *= 1.0 - 0.8 * texture2D(uTat, vec2(tu.x, tu.y)).a; }
         diffuseColor.rgb = sk;
-        if (uUni > 0.5) { wSkin = 0.0; diffuseColor.rgb = vec3(0.016, 0.027, 0.055) * (0.9 + 0.15 * vn(vRest * 2.0)); } } // manga longa do uniforme por cima
-      else if (dd < 11.0 && s >= 0.955 && s < 1.12) { wMask = 1.0; vec3 kq = vRest * 14.0; float kn = 0.5 + 0.5 * sin(kq.x + 2.0 * sin(kq.y)) * sin(kq.z + kq.y);
-        diffuseColor.rgb = mix(vec3(0.012, 0.012, 0.014) * (0.7 + 0.6 * kn), vec3(0.75, 0.6, 0.02), smoothstep(0.955, 0.958, s) * (1.0 - smoothstep(0.966, 0.969, s))); }
+        if (uUni > 0.5) { wSkin = 0.0; diffuseColor.rgb = uSleeve * (0.9 + 0.15 * vn(vRest * 2.0)); } } // manga longa do uniforme por cima
+      else if (uGlove > 0.5 && dd < 11.0 && s >= 0.9 && s < 1.12) { wMask = 1.0; vec3 kq = vRest * 9.0; float kn = vn(kq) * 0.6 + vn(kq * 3.1) * 0.4;
+        diffuseColor.rgb = uGloveCol * (0.78 + 0.4 * kn) * mix(0.8, 1.0, smoothstep(0.9, 0.93, s)); }
+      else if (dd < 11.0 && s >= 0.955 && s < 1.12) { wSkin = 1.0; }
       if (wSkin < 0.5 && wMask < 0.5 && dot(diffuseColor.rgb, vec3(0.333)) > 0.5) {   // crepe branco: microfranzido + leve variação
         wShirt = 1.0; float cr = vn(vec3(vRest.x * 3.2, vRest.y * 0.8, vRest.z * 3.2)) * 0.6 + vn(vRest * 9.0) * 0.4;
         diffuseColor.rgb *= 0.93 + 0.09 * cr; }`,
@@ -275,7 +277,7 @@ export async function buildWorker(stage, app) {
   const vest = makeShell((x, y, z, arm) => (!arm || (y > 127 && Math.abs(x) < 18.5)) && y > 92 && y < 151 && Math.abs(x) < 19.5,
     (x, y, z) => VEST_OFF + (y > 134 ? 0.5 : 0) + (Math.abs(x) > 13 ? 0.4 : 0) + (z > 2 && y < 122 ? (122 - y) * 0.025 : 0) + Math.max(0, 100 - y) * 0.03, vestMat); // mais justo ao corpo
   vest.customDepthMaterial = vestDepth;
-  vest.name = 'colete';
+  vest.name = 'colete'; vest.visible = false;
 
   const rest = new Map(skel.bones.map((b) => [b, b.quaternion.clone()]));
   const restPos = new Map(skel.bones.map((b) => [b, b.position.clone()]));
@@ -368,30 +370,18 @@ export async function buildWorker(stage, app) {
     for (const e of [earL, earR]) { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0075, 0.016, 12), plugM); p.rotation.z = Math.PI / 2; p.position.x = Math.sign(e.position.x || 1) * 0.004; e.add(p); }
   }
 
-  // ── âncoras do dosímetro (CONTRACT): preso pelo clipe na CAMISA (gola/vista, junto à clavícula), por dentro da abertura do
-  //    colete; corpo do aparelho deitado sobre o peito (inclina ~20° para trás, acompanhando o tórax), microfone para cima,
-  //    ponta do microfone a ~150–180 mm do canal auditivo do mesmo lado (zona auditiva NHO-01: 150 ± 50 mm) ──
-  const chest = holderOn(B.Spine2);
-  const mk = (par, pos, ry = 0, rx = 0, rz = 0) => { const o = new THREE.Object3D(); o.position.copy(pos); o.rotation.set(rx, ry, rz, 'YXZ'); par.add(o); return o; };
-  const DOSI = { x: 6.0, y: 137.6, z: 7.2, ry: 0.2, rx: -0.32, rz: -0.16 }; // cm do modelo (repouso)
-  const anchors = {
-    shoulderL: mk(chest, relTo(B.Spine2, [DOSI.x, DOSI.y, DOSI.z]), DOSI.ry, DOSI.rx, DOSI.rz),
-    shoulderR: mk(chest, relTo(B.Spine2, [-DOSI.x, DOSI.y, DOSI.z]), -DOSI.ry, DOSI.rx, -DOSI.rz),
-    earL: head?.anchors?.earL || earL, earR: head?.anchors?.earR || earR,
-    head: head?.anchors?.head || mk(headH, hp(0, 160, -3)),
-  };
-
-  // ── pose ──
+  // ══════════════ MOVIMENTO (procedural): caminhada, sentar, atividades A1–A4 por ambiente ══════════════
+  const Y = V3(0, 1, 0), gqNow = new THREE.Quaternion();
   const tq = new THREE.Quaternion(), pq = new THREE.Quaternion();
   const wpos = (b) => b.getWorldPosition(V3());
-  const W = (x, y, z) => V3(x, y, z).applyQuaternion(gq);  // direção no corpo → mundo
+  const W = (x, y, z) => V3(x, y, z).applyQuaternion(gqNow);
   function setWQ(bone, q) { bone.parent.getWorldQuaternion(pq); bone.quaternion.copy(pq.invert().multiply(q)); bone.updateMatrixWorld(true); }
   function aim(bone, child, target, k = 1) {
     const bp = wpos(bone), cur = wpos(child).sub(bp).normalize(), des = target.clone().sub(bp).normalize();
     const d = new THREE.Quaternion().setFromUnitVectors(cur, des); if (k < 1) d.slerp(new THREE.Quaternion(), 1 - k);
     bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(d));
   }
-  function rotW(bone, axisW, ang) { bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(new THREE.Quaternion().setFromAxisAngle(axisW, ang))); }
+  function rotW(bone, axisW, ang) { if (!bone || !ang) return; bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(new THREE.Quaternion().setFromAxisAngle(axisW, ang))); }
   function ik(side, target, pole) {
     const ua = B[side + '_UpperArm'], fa = B[side + '_Forearm'], ha = B[side + '_Hand'];
     const s = wpos(ua), a = wpos(fa).distanceTo(s), b = wpos(ha).distanceTo(wpos(fa));
@@ -401,144 +391,301 @@ export async function buildWorker(stage, app) {
     aim(ua, fa, s.clone().add(dir.clone().multiplyScalar(along)).add(perp.multiplyScalar(h)));
     aim(fa, ha, s.clone().add(dir.multiplyScalar(d)));
   }
-  // Dedos: dobra no eixo LOCAL de cada falange (biped do Rocketbox: o eixo de flexão é o mesmo em todas), evitando a
-  // "garra" que surgia com eixos calculados no mundo. Ângulos [proximal, média, distal] em rad.
-  const _fq = new URLSearchParams(location.search);
-  const F_AX = { x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1) }[_fq.get('fax') || 'z'], F_SG = +(_fq.get('fsg') || 1);
-  const T_AX = { x: V3(1, 0, 0), y: V3(0, 1, 0), z: V3(0, 0, 1) }[_fq.get('tax') || 'z'], T_SG = +(_fq.get('tsg') || 1);
-  const _q = new THREE.Quaternion();
-  function finger(side, f, angs, axis = F_AX, sg = F_SG) {
-    ['', '1', '2'].forEach((k, i) => { const b = B[side + '_Finger' + f + k]; if (b && angs[i]) { b.quaternion.multiply(_q.setFromAxisAngle(axis, sg * angs[i])); } });
-  }
-  function handPose(side, point, k = 1) { // point: 1 = indicador apontando; 0 = mão relaxada
-    const P = (a, r) => a.map((x, i) => (x * point + r[i] * (1 - point)) * k);
-    finger(side, '1', P([0.12, 0.08, 0.05], [0.35, 0.45, 0.3]));        // indicador
-    finger(side, '2', P([1.35, 1.45, 0.85], [0.45, 0.55, 0.35]));       // médio
-    finger(side, '3', P([1.45, 1.5, 0.85], [0.5, 0.6, 0.35]));          // anelar
-    finger(side, '4', P([1.5, 1.45, 0.8], [0.55, 0.6, 0.35]));          // mínimo
-    finger(side, '0', P([0.35, 0.55, 0.35], [0.15, 0.25, 0.15]), T_AX, T_SG); // polegar recolhido sobre o médio
+  const _q = new THREE.Quaternion(), FAX = V3(0, 0, 1);
+  function finger(side, f, angs) { ['', '1', '2'].forEach((k, i) => { const b = B[side + '_Finger' + f + k]; if (b && angs[i]) b.quaternion.multiply(_q.setFromAxisAngle(FAX, angs[i])); }); }
+  function handPose(side, grip) { // grip: 0 relaxada … 1 fechada (segurando esteira/copo/volante)
+    const P = (a, r) => a.map((x, i) => x * grip + r[i] * (1 - grip));
+    finger(side, '1', P([0.9, 1.0, 0.6], [0.3, 0.4, 0.25])); finger(side, '2', P([1.0, 1.1, 0.65], [0.38, 0.48, 0.3]));
+    finger(side, '3', P([1.05, 1.1, 0.65], [0.45, 0.55, 0.32])); finger(side, '4', P([1.1, 1.05, 0.6], [0.5, 0.55, 0.32]));
+    finger(side, '0', P([0.45, 0.6, 0.4], [0.15, 0.25, 0.15]));
     B[side + '_Hand']?.updateMatrixWorld(true);
   }
   const headFwdLocal = V3(0, 0, 1).applyQuaternion(gq).applyQuaternion(B.Head.getWorldQuaternion(new THREE.Quaternion()).invert());
   const lidRest = ['LEyeBlinkTop', 'REyeBlinkTop'].map((n) => B[n]).filter(Boolean);
 
-  function button() { const pb = app?.machines?.panelButton; if (pb?.isObject3D) return pb.getWorldPosition(V3()); if (pb?.isVector3) return pb.clone(); return BTN_DEFAULT.clone(); }
-  // ── MOVIMENTO: ciclo de trabalho procedural (sem clips de animação), tudo misturado suavemente ──
-  // fases: 'digitar' (mão vai de tecla em tecla e aperta), 'tela' (confere a tela), 'prensa' (baixa o braço, vira o tronco
-  // e a cabeça para a prensa), 'apoio' (braços baixos, troca o apoio das pernas). Atividades: operando | parada | olhando.
-  let activity = 'operando', t0 = 0, blinkT = 2.5, blink = 0;
-  const rnd = (a, b) => a + Math.random() * (b - a);
-  const KEYS = [[0, 0], [0.032, 0], [-0.03, -0.034], [0, -0.034], [0.032, -0.068], [-0.03, 0.03], [0.016, -0.1]];
-  let phase = 'digitar', phaseT = 0, phaseDur = rnd(5, 7), keyI = 0, keyT = 0, keyDur = 0.7, pressK = 0;
-  const S = { arm: 1, turn: 0, shift: 0, lookAt: V3(1.5, 1.6, 0.2), key: V3(), keyInit: false, idleLook: V3(1.5, 1.5, 0.3), idleT: 0 };
-  function nextPhase() {
-    const seq = { digitar: Math.random() < 0.6 ? 'tela' : 'prensa', tela: Math.random() < 0.5 ? 'digitar' : 'prensa', prensa: Math.random() < 0.25 ? 'apoio' : 'digitar', apoio: 'digitar' };
-    phase = seq[phase] || 'digitar'; phaseT = 0;
-    phaseDur = { digitar: rnd(4.5, 7.5), tela: rnd(1.8, 3.0), prensa: rnd(2.0, 3.2), apoio: rnd(2.0, 3.0) }[phase];
+  // medidas do corpo (repouso, grupo na origem)
+  group.updateMatrixWorld(true);
+  const hipRest = wpos(B.Pelvis).y, Lt = wpos(B.L_Calf).distanceTo(wpos(B.L_Thigh)), Lc = wpos(B.L_Foot).distanceTo(wpos(B.L_Calf)), ankH = wpos(B.L_Foot).y;
+  const hipX = wpos(B.Pelvis).x, hipZ = wpos(B.Pelvis).z;
+
+  // ── âncoras (CONTRATO: head, handL, handR) e adereços ──
+  const palm = (sd) => { const h = holderOn(B[sd + '_Hand']); const f = wpos(B[sd + '_Finger2']).sub(wpos(B[sd + '_Hand'])).multiplyScalar(0.5);
+    h.updateWorldMatrix(true, false); const o = new THREE.Object3D(); o.position.copy(h.worldToLocal(wpos(B[sd + '_Hand']).add(f))); h.add(o); return o; };
+  const anchors = { head: head?.anchors?.head || (() => { const o = new THREE.Object3D(); o.position.copy(hp(0, 160, -3)); headH.add(o); return o; })(), handL: palm('L'), handR: palm('R') };
+  const std = (c, r = 0.6, m = 0) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+  const props = new THREE.Group(); props.name = 'trabalhadora_props'; stage.scene.add(props);
+  const shadowed = (o) => { o.traverse((m) => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); return o; };
+  // esteira 60×40 de alumínio perfurado com 8 pães (cru/assado)
+  const tray = new THREE.Group(); props.add(tray);
+  { const alu = std(0x9ea2a6, 0.42, 0.75); tray.add(new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.006, 0.4), alu));
+    for (const [w, d, x, z] of [[0.6, 0.012, 0, 0.197], [0.6, 0.012, 0, -0.197], [0.012, 0.4, 0.297, 0], [0.012, 0.4, -0.297, 0]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w, 0.018, d), alu); r.position.set(x, 0.008, z); tray.add(r); }
+    const bunG = new THREE.SphereGeometry(1, 18, 10); tray.userData.raw = std(0xe9dcc4, 0.85); tray.userData.baked = new THREE.MeshPhysicalMaterial({ color: 0xc27a32, roughness: 0.55, clearcoat: 0.2 });
+    tray.userData.buns = [];
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) { const b = new THREE.Mesh(bunG, tray.userData.raw); b.scale.set(0.055, 0.032, 0.085); b.position.set(-0.21 + i * 0.14, 0.03, -0.09 + j * 0.18); b.rotation.y = (i * 7 + j * 3) % 5 * 0.06; tray.add(b); tray.userData.buns.push(b); } }
+  shadowed(tray); tray.visible = false;
+  const setBaked = (b) => { for (const m of tray.userData.buns) { m.material = b ? tray.userData.baked : tray.userData.raw; m.scale.y = b ? 0.042 : 0.032; } };
+  // copo d'água (descanso), caneta e livro da caldeira (sala de controle), massa (bancada)
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.028, 0.095, 18, 1, true), new THREE.MeshPhysicalMaterial({ color: 0xf6f6f6, roughness: 0.35, side: THREE.DoubleSide, transmission: 0.3 }));
+  cup.add(new THREE.Mesh(new THREE.CircleGeometry(0.033, 18).rotateX(-Math.PI / 2).translate(0, 0.03, 0), new THREE.MeshPhysicalMaterial({ color: 0xbfd8e6, roughness: 0.05 })));
+  anchors.handR.add(cup); cup.position.set(0, -0.01, 0.0); shadowed(cup); cup.visible = false;
+  const pen = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.004, 0.14, 8), std(0x1a3a8a, 0.4)); anchors.handR.add(pen); pen.rotation.x = 1.0; pen.visible = false;
+  const book = new THREE.Group(); props.add(book);
+  { const cov = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.008, 0.31), std(0x1d2c4a, 0.7)); book.add(cov);
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 360; const g = cv.getContext('2d'); g.fillStyle = '#f3f1ea'; g.fillRect(0, 0, 512, 360);
+    g.strokeStyle = '#9fb3c8'; g.lineWidth = 1; for (let y = 40; y < 350; y += 16) { g.beginPath(); g.moveTo(14, y); g.lineTo(246, y); g.moveTo(266, y); g.lineTo(498, y); g.stroke(); }
+    g.fillStyle = '#2a3550'; g.font = 'bold 15px sans-serif'; g.fillText('LIVRO DE REGISTRO — CALDEIRA 1', 18, 26);
+    g.font = '12px sans-serif'; g.fillStyle = '#26344f'; for (let k = 0; k < 13; k++) g.fillText(`${String(6 + (k >> 2)).padStart(2, '0')}:${String((k % 4) * 15).padStart(2, '0')}   P 9,6 kgf/cm²   nível OK   ✓`, 18, 54 + k * 16 - 4);
+    g.strokeStyle = '#ccc'; g.beginPath(); g.moveTo(256, 0); g.lineTo(256, 360); g.stroke();
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const pg = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.295), new THREE.MeshStandardMaterial({ map: t, roughness: 0.85 })); pg.rotation.x = -Math.PI / 2; pg.position.y = 0.0105; book.add(pg); }
+  shadowed(book); book.visible = false;
+  const dough = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 12), new THREE.MeshPhysicalMaterial({ color: 0xeee4d0, roughness: 0.8, sheen: 0.4, sheenColor: new THREE.Color(0xffffff) }));
+  props.add(shadowed(dough)); dough.visible = false;
+  // volante da válvula de bloqueio no distribuidor, ao alcance do ponto S2 das caldeiras (derivação do coletor)
+  const valve = new THREE.Group(); props.add(valve);
+  { const cast = std(0x3a3d40, 0.55, 0.6), red = new THREE.MeshPhysicalMaterial({ color: 0xb01a14, roughness: 0.45, clearcoat: 0.3 }), steel = std(0x8a8d90, 0.4, 0.9);
+    const vz = -8.25, vx = 47.9, vy = 1.55;
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 16).rotateX(Math.PI / 2), std(0x6d6460, 0.5, 0.7)); pipe.position.set(vx, vy, vz + 0.15); valve.add(pipe);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.075, 18, 12), cast); body.position.set(vx, vy, vz + 0.33); body.scale.set(1, 1, 1.15); valve.add(body);
+    for (const dz of [0.22, 0.44]) { const f = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.022, 20).rotateX(Math.PI / 2), cast); f.position.set(vx, vy, vz + dz); valve.add(f); }
+    const bon = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.16, 16).rotateX(Math.PI / 2), cast); bon.position.set(vx, vy, vz + 0.5); valve.add(bon);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.14, 8).rotateX(Math.PI / 2), steel); stem.position.set(vx, vy, vz + 0.62); valve.add(stem);
+    const wheel = new THREE.Group(); wheel.position.set(vx, vy, vz + 0.66); valve.add(wheel); valve.userData.wheel = wheel; valve.userData.c = V3(vx, vy, vz + 0.66);
+    wheel.add(new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.014, 10, 40), red));
+    for (let k = 0; k < 3; k++) { const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.31, 6), red); sp.rotation.z = k * Math.PI / 3; wheel.add(sp); }
+    wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.04, 12).rotateX(Math.PI / 2), red)); }
+  shadowed(valve);
+
+  // ── touca descartável de TNT (sanfonada, elástico na borda) — forneira ──
+  let touca = null;
+  if (head?.frame && head.debug) {
+    const d = head.debug, cz = (d.zF + d.zB) / 2, rx = d.hw + 0.03, rz = (d.zF - d.zB) / 2 + 0.034, yc = -0.02, ry = d.T - yc + 0.045;
+    const rimY = (a) => { const c = Math.cos(a); return c > 0 ? -0.006 + 0.056 * c * c : -0.006 - 0.085 * c * c; };
+    const NA = 96, NE = 18, pos = [], uv = [], idx = [];
+    for (let j = 0; j <= NE; j++) for (let i = 0; i <= NA; i++) {
+      const a = (i / NA) * Math.PI * 2, t = j / NE, y0 = rimY(a), y = y0 + (yc + ry - y0) * Math.sin(t * Math.PI / 2);
+      const k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)), puff = 1 + 0.11 * Math.sin(t * Math.PI) + (0.022 * Math.sin(a * 7 + t * 9 + 1.3 * Math.sin(a * 3)) + 0.012 * Math.sin(a * 17 - t * 13)) * Math.sin(t * Math.PI) - 0.04 * Math.max(0, Math.cos(a)) * Math.sin(t * Math.PI);
+      const pleat = 1 + 0.035 * Math.pow(1 - t, 3) * Math.sin(a * 46 + 2 * Math.sin(a * 5)) - 0.03 * Math.pow(1 - t, 6);
+      const r = k * puff * pleat; pos.push(Math.sin(a) * rx * r, y + 0.006 * Math.sin(t * Math.PI), cz + Math.cos(a) * rz * r); uv.push(i / NA * 8, t * 2);
+    }
+    for (let j = 0; j < NE; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + NA + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cg = cv.getContext('2d'); const im = cg.createImageData(128, 128);
+    for (let i = 0; i < im.data.length; i += 4) { const v = 150 + Math.random() * 105; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } cg.putImageData(im, 0, 0);
+    const bt = new THREE.CanvasTexture(cv); bt.wrapS = bt.wrapT = THREE.RepeatWrapping;
+    const tm = new THREE.MeshPhysicalMaterial({ color: 0xf3f3f0, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.8, bumpMap: bt, bumpScale: 0.6, side: THREE.DoubleSide });
+    touca = new THREE.Group(); touca.name = 'touca'; touca.add(new THREE.Mesh(g, tm));
+    const rim = []; for (let i = 0; i <= 160; i++) { const a = i / 160 * Math.PI * 2, y = rimY(a), k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)) * (0.985 + 0.012 * Math.sin(a * 46)); rim.push(V3(Math.sin(a) * rx * k, y + 0.002, cz + Math.cos(a) * rz * k)); }
+    touca.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 240, 0.0042, 6, true), tm));
+    shadowed(touca); head.frame.add(touca);
   }
-  const sm = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+
+  // ── ambiente: forneira de branco × operadora de caldeira de azul-marinho ──
+  let BM = null; try { BM = await import('./worker_boots.js'); } catch (e) { /* sem botina */ }
+  let envCur = null;
+  function applyEnv(env) {
+    envCur = env; const w = env !== 'caldeiras';
+    uni?.setEnv?.(env); bodyMat.map = w ? bodyTexW : bodyTexN; bodyMat.needsUpdate = true;
+    armU.uSleeve.value.set(...(w ? [0.8, 0.79, 0.76] : [0.016, 0.027, 0.055]));
+    BM?.BOOT_U?.uBootCol.value.setRGB(...(w ? [0.62, 0.62, 0.6] : [0.011, 0.01, 0.0095]));
+    const P = head?.parts || {}; for (const k of ['helmet', 'glasses', 'hair', 'strap']) if (P[k]) P[k].visible = !w;
+    for (const e of [head?.anchors?.earL, head?.anchors?.earR]) e?.children.forEach((c) => (c.visible = !w));
+    if (touca) touca.visible = w; valve.visible = !w;
+  }
+  applyEnv(app?.state?.env || 'fornos');
+  app?.on?.('env', (e) => applyEnv(e));
+
+  // ── locomoção: rotas por corredores livres (cadeias de pontos até o "hub" de cada ambiente) ──
+  const ST = app?.STATIONS || {};
+  const envOf = (id) => ((ST[id]?.worker?.[0] ?? 0) > 25 ? 'caldeiras' : 'fornos');
+  const HUB = { fornos: [6.3, 0.0], caldeiras: [47.2, 0.6] };
+  const CHAIN = { forno: [[6.95, -3.3], [6.95, -0.6]], bancada: [[5.2, -0.5]], descanso: [[-5.2, 3.6], [-4.5, 0.6]],
+    caldeira: [[36.2, 0.5]], valvulas: [[47.9, -5.5], [47.6, 0.4]], controle: [[51.3, 6.2], [49.85, 6.2], [49.85, 8.92], [47.4, 8.6]] };
+  const SEAT = { descanso: 0.45, controle: 0.505 };
+  const PATROL = { 'bancada:A4': [[5.2, -0.5], [6.6, -0.5]], 'valvulas:A4': [[47.9, -5.5], [47.9, -2.6]] };
+  const fwdOf = (r) => new THREE.Vector2(Math.sin(r), Math.cos(r));
+  const standOf = (id) => { const s = ST[id], w = new THREE.Vector2(s.worker[0], s.worker[2]); return s.seated ? w.add(fwdOf(s.workerRotY).multiplyScalar(id === 'controle' ? 0.36 : 0.3)) : w; };
+  const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const sst = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+  const L = { pos: new THREE.Vector2(), head: 0, v: 0, path: null, pi: 0, mode: 'stand', queue: [], phase: 0, walkW: 0, sitW: 0, sitT: 0, from: null, to: null,
+    st: null, act: 'A2', look: false, actT: 0, turnTo: 0, hipSeat: 0.54, patrol: null, pIdx: 0, wait: 0 };
+  const next = () => { const f = L.queue.shift(); if (f) f(); else L.mode = L.sitW > 0.5 ? 'seated' : 'stand'; };
+  const walk = (pts) => () => { L.path = pts.map((p) => new THREE.Vector2(p[0] ?? p.x, p[1] ?? p.y)); L.pi = 0; L.mode = 'walk'; };
+  const turn = (r) => () => { L.turnTo = r; L.mode = 'turn'; };
+  const sitDown = (id) => () => { const s = ST[id]; L.from = L.pos.clone(); L.to = new THREE.Vector2(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.hipSeat = SEAT[id] + 0.09; L.sitT = 0; L.mode = 'sitdown'; };
+  const standUp = () => () => { L.from = L.pos.clone(); const s = ST[L.st]; L.to = s ? standOf(L.st) : L.pos.clone(); L.sitT = 0; L.mode = 'standup'; };
+  function route(fromId, toId, cur) {
+    const e = envOf(toId), pts = [[cur.x, cur.y]];
+    if (fromId && CHAIN[fromId]) pts.push(...CHAIN[fromId]);
+    pts.push(HUB[e], ...[...CHAIN[toId]].reverse()); const sp = standOf(toId); pts.push([sp.x, sp.y]);
+    return pts.filter((p, i) => i === 0 || Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) > 0.05);
+  }
+  function setStation(id, { act, instant } = {}) {
+    const s = ST[id]; if (!s) return;
+    if (act) { if (act === 'olhando') L.look = true; else { if (act !== L.act) L.actT = 0; L.act = act; L.look = false; } }
+    const sameEnv = L.st && envOf(L.st) === envOf(id);
+    if (instant || !sameEnv) {
+      L.queue = []; L.st = id; L.head = s.workerRotY; L.v = 0; L.walkW = 0;
+      if (s.seated) { L.pos.set(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.sitW = 1; L.hipSeat = SEAT[id] + 0.09; L.mode = 'seated'; }
+      else { L.pos.set(s.worker[0], s.worker[2]); L.sitW = 0; L.mode = 'stand'; }
+      startPatrol(); return;
+    }
+    if (id === L.st && L.mode !== 'walk' && !L.patrol) { startPatrol(); return; }
+    const q = [];
+    if (L.mode === 'seated' || L.mode === 'sitdown') q.push(standUp());
+    const from = L.mode === 'walk' ? null : L.st, cur = () => L.pos.clone();
+    q.push(() => walk(route(from, id, cur()))(), turn(s.workerRotY));
+    if (s.seated) q.push(sitDown(id));
+    q.push(() => { startPatrol(); next(); });
+    L.st = id; L.patrol = null; L.queue = q; if (L.mode === 'walk') { L.mode = 'stand'; } next();
+  }
+  function startPatrol() { const p = PATROL[`${L.st}:${L.act}`]; L.patrol = p ? [[ST[L.st].worker[0], ST[L.st].worker[2]], ...p] : null; L.pIdx = 0; L.wait = 1.2; }
+  function locomotion(dt) {
+    if (L.mode === 'walk' || L.mode === 'turn') L.sitW = Math.max(0, L.sitW - dt * 1.5);
+    if (L.mode === 'walk') {
+      const tgt = L.path[L.pi], d = tgt.clone().sub(L.pos), dist = d.length();
+      if (dist < 0.04) { L.pi++; if (L.pi >= L.path.length) { L.v = 0; next(); } return 0; }
+      let rem = dist; for (let k = L.pi + 1; k < L.path.length; k++) rem += L.path[k].distanceTo(L.path[k - 1]);
+      const dh = wrap(Math.atan2(d.x, d.y) - L.head); L.head += Math.sign(dh) * Math.min(Math.abs(dh), 4.2 * dt);
+      const vmax = Math.min(1.1, Math.sqrt(2 * 1.4 * rem) + 0.12) * (Math.abs(dh) > 1.0 ? 0.35 : 1);
+      L.v += Math.sign(vmax - L.v) * Math.min(Math.abs(vmax - L.v), 2.0 * dt);
+      const step = Math.min(L.v * dt, dist); L.pos.addScaledVector(d.normalize(), step); return step;
+    }
+    if (L.mode === 'turn') { const dh = wrap(L.turnTo - L.head); const r = Math.sign(dh) * Math.min(Math.abs(dh), 2.4 * dt); L.head += r; if (Math.abs(dh) < 0.01) { L.head = L.turnTo; next(); } return Math.abs(r) * 0.35; }
+    if (L.mode === 'sitdown' || L.mode === 'standup') {
+      L.sitT = Math.min(1, L.sitT + dt / 1.4); const k = sst(L.sitT); L.pos.copy(L.from).lerp(L.to, sst(L.sitT * 1.3 - (L.mode === 'standup' ? 0.3 : 0)));
+      L.sitW = L.mode === 'sitdown' ? k : 1 - k; if (L.sitT >= 1) next(); return 0;
+    }
+    if (L.mode === 'stand' && L.patrol) { L.wait -= dt; if (L.wait < 0) { L.pIdx = (L.pIdx + 1) % L.patrol.length; const tg = L.patrol[L.pIdx];
+      const back = L.pIdx === 0; L.queue = [walk([[L.pos.x, L.pos.y], tg]), ...(back ? [turn(ST[L.st].workerRotY)] : []), () => { L.wait = back ? 2.5 : 1.0; L.mode = 'stand'; }]; next(); } }
+    return 0;
+  }
+
+  // ── pose por atividade ──
+  const BP = (x, y, z) => { const c = Math.cos(L.head), s = Math.sin(L.head); return V3(L.pos.x + x * c + z * s, y, L.pos.y - x * s + z * c); };
+  const S = { look: V3(0, 1.5, 5), lean: 0, twist: 0, hL: null, hR: null, wL: 0, wR: 0, blinkT: 2.5, blink: 0, rot: 0 };
   const smV = (cur, tgt, rate, dt) => cur.lerp(tgt, 1 - Math.exp(-rate * dt));
-  const PRESS_POS = V3(0.62, 1.12, 0.32);               // 'conferir': olha os seletores/botões de baixo do painel (rosto visível)
+  const smN = (cur, tgt, rate, dt) => cur + (tgt - cur) * (1 - Math.exp(-rate * dt));
+  const camPos = () => stage.camera?.position?.clone() || BP(0, 1.5, 3);
+  function activityPose(t) {
+    const P = { lean: 0.02, twist: 0, hL: null, hR: null, look: BP(0, 1.5, 3), tray: false, baked: false, glove: 0, cup: false, pen: false, book: false, dough: false, gripL: 0.15, gripR: 0.15, fdirL: null, fdirR: null };
+    const env = envOf(L.st || 'forno'), a = L.act, T = L.actT, moving = L.mode === 'walk' || L.mode === 'turn';
+    if (env === 'caldeiras') P.glove = 2;
+    if (env === 'fornos') {
+      if (a === 'A1' && L.st === 'forno' && !moving) {
+        P.glove = 1; P.tray = true; P.gripL = P.gripR = 0.85;
+        const door = app?.machines?.doorOpen?.('forno1') ?? 0;
+        let ext = 0; if (door > 0.6) { const u = (T % 7) / 7; ext = u < 0.3 ? sst(u / 0.3) : u < 0.45 ? 1 : u < 0.75 ? 1 - sst((u - 0.45) / 0.3) : 0; P.baked = u >= 0.45 || u < 0.02; }
+        P.hL = BP(0.29, 1.0 + 0.03 * ext, 0.3 + 0.36 * ext); P.hR = BP(-0.29, 1.0 + 0.03 * ext, 0.3 + 0.36 * ext); P.lean = 0.08 + 0.32 * ext;
+        const pb = app?.machines?.panelButton?.getWorldPosition?.(V3()) || BP(-0.5, 1.5, 0.8);
+        P.look = ext > 0.1 ? BP(0, 1.05, 0.9) : (Math.floor(T / 3.5) % 3 === 1 ? pb : BP(0.1, 1.15, 0.85));
+      } else if ((a === 'A4' || (a === 'A1' && moving)) ) {
+        P.tray = true; P.gripL = P.gripR = 0.85; P.baked = a === 'A1'; P.glove = a === 'A1' ? 1 : 0;
+        P.hL = BP(0.29, 1.0, 0.3); P.hR = BP(-0.29, 1.0, 0.3); P.lean = 0.04;
+      } else if (a === 'A2' && L.st === 'bancada' && !moving) {
+        const w = (2 * Math.PI) / 1.25, roll = (T % 12) > 8.5, s = Math.sin(T * w);
+        if (!roll) { P.hL = BP(0.12, 0.95 + 0.02 * Math.max(0, s), 0.42 + 0.07 * s); P.hR = BP(-0.12, 0.95 + 0.02 * Math.max(0, -s), 0.42 - 0.07 * s); }
+        else { const o = 0.06 + 0.1 * (0.5 + 0.5 * Math.sin(T * 3.4)); P.hL = BP(o, 0.94, 0.44 + 0.03 * Math.sin(T * 6.8)); P.hR = BP(-o, 0.94, 0.44 + 0.03 * Math.sin(T * 6.8)); }
+        P.lean = 0.3 + 0.04 * s; P.look = BP(0, 0.9, 0.45); P.dough = true; P.fdirL = P.fdirR = 'down'; P.gripL = P.gripR = 0.25;
+      } else if (a === 'A3' && L.mode === 'seated') {
+        P.cup = true; P.gripR = 0.75; P.lean = -0.04;
+        const u = (T % 11) / 11, k = u > 0.55 && u < 0.85 ? Math.sin(((u - 0.55) / 0.3) * Math.PI) : 0;
+        const mouth = wpos(B.Head).addScaledVector(W(0, 0, 1), 0.1).addScaledVector(Y, -0.06);
+        P.hR = BP(-0.15, 0.66, 0.24).lerp(mouth, Math.min(1, k * 1.4)); P.hL = BP(0.14, 0.64, 0.22); P.drink = k;
+        P.look = k > 0.3 ? BP(0, 1.6, 1.0) : (Math.floor(T / 4) % 2 ? camPos() : BP(0.6, 1.0, 2.5));
+      }
+    } else {
+      if (a === 'A1' && L.st === 'caldeira' && !moving) {
+        const u = T % 16;
+        if (u < 4) P.look = V3(35.42, 2.3, -1.44); else if (u < 7) P.look = V3(36.85, 3.48, -2.1);
+        else if (u < 11) { P.look = V3(36.36, 1.49, -1.0); P.lean = 0.22; } else { P.look = V3(36.0, 1.25, -1.25); P.lean = 0.2; P.hL = V3(36.0, 1.28, -1.22); P.gripL = 0.8; }
+      } else if (a === 'A2' && L.st === 'valvulas' && !moving) {
+        const c = valve.userData.c, per = 2.2, u = (T % per) / per, rot = u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7 * (1 - sst((u - 0.75) / 0.25));
+        S.rot += (u < 0.75 ? 1 : 0) * 0.0; valve.userData.wheel.rotation.z = -(Math.floor(T / per) * 0.7 + (u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7));
+        const ang = (b) => V3(c.x + Math.cos(b) * 0.16, c.y + Math.sin(b) * 0.16, c.z + 0.025);
+        P.hL = ang(Math.PI - 0.55 - rot); P.hR = ang(0.55 - rot); P.gripL = P.gripR = 0.9; P.lean = 0.1; P.look = c.clone();
+      } else if (a === 'A3' && L.mode === 'seated') {
+        P.book = true; P.pen = true; P.lean = 0.32;
+        const bk = BP(0.03, SEAT.controle + 0.27, 0.57), wr = (T % 6) < 4.5;
+        P.hR = bk.clone().add(BP(-0.07 + 0.08 * ((T * 0.25) % 1) - L.pos.x * 0, 0, 0).sub(BP(0, 0, 0))).add(V3(0, 0.03 + (wr ? 0.004 * Math.sin(T * 23) : 0.03), 0));
+        P.hL = bk.clone().add(BP(0.13, 0, 0.02).sub(BP(0, 0, 0))).add(V3(0, 0.025, 0)); P.gripR = 0.7; P.fdirL = 'down';
+        P.look = bk; P.bookPos = bk;
+      }
+    }
+    if (L.look) P.look = camPos();
+    else if (moving) P.look = BP(0, 1.45, 3);
+    return P;
+  }
+
   function update(dt, t) {
-    t0 += dt; dt = Math.min(dt, 0.1);
+    dt = Math.min(dt || 0, 0.1); L.actT += dt;
     for (const [b, qr] of rest) b.quaternion.copy(qr);
     for (const b of lidRest) b.position.copy(restPos.get(b));
-    group.updateMatrixWorld(true);
-    const op = activity === 'operando';
-    // diretor de fases
-    if (op) { phaseT += dt; if (phaseT > phaseDur) nextPhase(); } else phase = 'apoio';
-    const armT = op && (phase === 'digitar' || phase === 'tela' || phase === 'prensa') ? 1 : 0; // na prensa só a cabeça vira; a mão fica no painel
-    const turnT = op && phase === 'prensa' ? 1 : 0;
-    S.arm = sm(S.arm, armT, armT ? 2.6 : 2.0, dt);
-    S.turn = sm(S.turn, turnT, 1.8, dt);
-    const shiftT = Math.sin(t0 * 2 * Math.PI / 9.5) * (phase === 'apoio' ? 1 : 0.45);
-    S.shift = sm(S.shift, shiftT, 1.5, dt);
-    const br = Math.sin(t0 * 2 * Math.PI / 4.3);
-    const side = W(1, 0, 0), fwd = W(0, 0, 1), up = V3(0, 1, 0);
-    const armW = S.arm, turn = S.turn;
-    // tronco: giro para a câmera quando opera; para a prensa (esquerda, +yaw) quando confere a peça; troca de apoio (rolagem)
-    rotW(B.Pelvis, up, -0.12 * armW + 0.05 * turn + 0.03 * Math.sin(t0 * 0.21));
-    rotW(B.Pelvis, fwd, 0.035 * S.shift);
-    rotW(B.Spine1, side, 0.03 + 0.06 * armW + br * 0.012);
-    rotW(B.Spine1, up, -0.17 * armW + 0.05 * turn);
-    rotW(B.Spine1, fwd, -0.028 * S.shift);
-    rotW(B.Spine2, side, 0.02 + 0.03 * armW + br * 0.016);
-    rotW(B.Spine2, up, -0.2 * armW + 0.08 * turn + Math.sin(t0 * 0.37) * 0.012);
-    for (const [cal, sg] of [[B.L_Calf, 1], [B.R_Calf, -1]]) if (cal) rotW(cal, side, -0.07 * Math.max(0, sg * S.shift)); // joelho da perna sem apoio dobra
-    if (B.R_Clavicle) rotW(B.R_Clavicle, W(0, 0, 1), -0.12 * armW + br * 0.006);
-    if (B.L_Clavicle) rotW(B.L_Clavicle, W(0, 0, 1), br * 0.006);
-    // aproxima do painel só o necessário para alcançar a tecla
-    { const bx = button().x, shx = wpos(B.R_UpperArm).x;
-      group.position.x = Math.max(0, Math.min(0.12, group.position.x + ((bx - 0.40 - shx)) * armW * Math.min(1, dt * 3))); group.updateMatrixWorld(true); }
-    const btnL = button(); btnL.y = Math.min(btnL.y, 1.68);
-    // olhar: tecla → tela → prensa; parada: passeia o olhar; olhando: câmera
-    const look = V3();
-    if (activity === 'olhando' && stage.camera) look.copy(stage.camera.position);
-    else if (op && phase === 'digitar' && S.keyInit) look.copy(S.key).add(V3(0, 0.03, 0));
-    else if (op && phase === 'tela') look.copy(btnL).addScaledVector(V3(0, 1, 0), 0.09);
-    else if (op && phase === 'prensa') look.copy(PRESS_POS);
-    else {
-      S.idleT -= dt; if (S.idleT < 0) { S.idleT = rnd(1.5, 3.5); const opts = [V3(2.5, 1.5, 0.4), PRESS_POS, V3(2.0, 1.45, 2.2), V3(3.0, 1.55, -0.6), btnL];
-        S.idleLook.copy(opts[Math.floor(Math.random() * opts.length)]); }
-      look.copy(S.idleLook);
+    const ds = locomotion(dt);
+    L.phase += (2 * Math.PI * ds) / 1.3;
+    L.walkW = smN(L.walkW, L.mode === 'walk' ? Math.min(1, L.v / 0.55) : L.mode === 'turn' ? 0.45 : 0, 7, dt);
+    const ww = L.walkW, sw = L.sitW, ph = L.phase;
+    const bob = ww * (0.018 * Math.cos(2 * ph) - 0.02);
+    const sitDrop = (hipRest - L.hipSeat) * sw;
+    group.position.set(L.pos.x, bob - sitDrop, L.pos.y);
+    group.rotation.y = L.head; group.updateMatrixWorld(true); gqNow.copy(group.quaternion);
+    const side = W(1, 0, 0), fwd = W(0, 0, 1), P = activityPose(t), br = Math.sin(t * 2 * Math.PI / 4.2);
+    // pelve e tronco
+    rotW(B.Pelvis, Y, 0.09 * Math.sin(ph) * ww); rotW(B.Pelvis, fwd, 0.035 * Math.cos(ph) * ww + 0.02 * Math.sin(t * 0.6) * (1 - ww) * (1 - sw));
+    S.lean = smN(S.lean, P.lean, 4, dt);
+    rotW(B.Spine, Y, -0.07 * Math.sin(ph) * ww); rotW(B.Spine1, Y, -0.06 * Math.sin(ph) * ww);
+    rotW(B.Spine1, side, S.lean * 0.55 + 0.03 * ww + br * 0.01); rotW(B.Spine2, side, S.lean * 0.45 + br * 0.014);
+    // pernas: caminhada (oscilador) + sentar (quadril/joelho 90°)
+    const phiS = 0.12, cs = (L.hipSeat - ankH - Lc * Math.cos(phiS)) / Lt, thS = Math.acos(Math.max(-1, Math.min(1, cs)));
+    for (const [sd, off, sx] of [['L', 0, 1], ['R', Math.PI, -1]]) {
+      const p = ph + off, A = 0.36 * ww, th = A * Math.sin(p) * (1 - sw) + thS * sw;
+      const knee = (ww * (0.06 + 0.9 * Math.pow(Math.max(0, Math.cos(p)), 2))) * (1 - sw) + (thS - phiS) * sw + (1 - ww) * (1 - sw) * 0.03;
+      rotW(B[sd + '_Thigh'], side, -th); rotW(B[sd + '_Thigh'], fwd, -sx * 0.07 * sw);
+      rotW(B[sd + '_Calf'], side, knee);
+      rotW(B[sd + '_Foot'], side, (th - knee) - 0.12 * ww * Math.max(0, Math.cos(p)) * (1 - sw));
     }
-    smV(S.lookAt, look, 4, dt); look.copy(S.lookAt);
-    { const hp0 = wpos(B.Head).add(V3(0, 0.09, 0)), dv = look.clone().sub(hp0), hz = Math.hypot(dv.x, dv.z), mx = hz * Math.tan(0.24);
+    // cabeça (antes dos braços: clavículas são filhas do pescoço)
+    smV(S.look, P.look, 3.5, dt);
+    { const look = S.look.clone(), hp0 = wpos(B.Head).add(V3(0, 0.09, 0)), dv = look.clone().sub(hp0), hz = Math.hypot(dv.x, dv.z), mx = hz * Math.tan(P.drink > 0.3 ? 0.6 : 0.5);
       if (dv.y > mx) look.y = hp0.y + mx;
-      // giro horizontal limitado a ±70° em relação à frente do corpo (pescoço real)
       const bf = W(0, 0, 1); bf.y = 0; bf.normalize(); const h2 = V3(dv.x, 0, dv.z).normalize();
-      const ang = Math.atan2(bf.x * h2.z - bf.z * h2.x, bf.dot(h2)), lim = 1.22;
-      if (Math.abs(ang) > lim) { const r = h2.clone().applyAxisAngle(V3(0, 1, 0), -(ang - Math.sign(ang) * lim)); look.x = hp0.x + r.x * hz; look.z = hp0.z + r.z * hz; } }                                         // queixo quase nivelado: olhar sobe no máx. ~14°
-    for (const [bone, k] of [[B.Neck, 0.25], [B.Head, 1]]) {
-      const hpw = wpos(B.Head).add(V3(0, 0.09, 0));
-      const fwdH = headFwdLocal.clone().applyQuaternion(B.Head.getWorldQuaternion(tq)).normalize();
-      const d = new THREE.Quaternion().setFromUnitVectors(fwdH, look.clone().sub(hpw).normalize()); d.slerp(new THREE.Quaternion(), 1 - k);
-      bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(d));
+      const ang = Math.atan2(bf.x * h2.z - bf.z * h2.x, bf.dot(h2)), lim = 1.2;
+      if (Math.abs(ang) > lim) { const r = h2.clone().applyAxisAngle(Y, -(ang - Math.sign(ang) * lim)); look.x = hp0.x + r.x * hz; look.z = hp0.z + r.z * hz; }
+      for (const [bone, k] of [[B.Neck, 0.3], [B.Head, 1]]) { const hpw = wpos(B.Head).add(V3(0, 0.09, 0));
+        const fwdH = headFwdLocal.clone().applyQuaternion(B.Head.getWorldQuaternion(tq)).normalize();
+        const d = new THREE.Quaternion().setFromUnitVectors(fwdH, look.clone().sub(hpw).normalize()); d.slerp(new THREE.Quaternion(), 1 - k);
+        bone.getWorldQuaternion(tq); setWQ(bone, tq.premultiply(d)); } }
+    // braços: alvo (IK) misturado com o balanço da caminhada
+    for (const [sd, sx, tgt, grip, fdir] of [['L', 1, P.hL, P.gripL, P.fdirL], ['R', -1, P.hR, P.gripR, P.fdirR]]) {
+      const key = 'h' + sd, wk = 'w' + sd;
+      S[wk] = smN(S[wk], tgt ? 1 : 0, 5, dt); if (tgt) S[key] = S[key] ? smV(S[key], tgt, 9, dt) : tgt.clone();
+      const swing = 0.42 * Math.sin(ph + (sd === 'L' ? Math.PI : 0)) * ww;
+      const sh = wpos(B[sd + '_UpperArm']);
+      const elbowDown = sh.clone().add(W(sx * 0.11, -1, 0.02 + swing).normalize().multiplyScalar(0.27));
+      const handDown = elbowDown.clone().add(W(sx * 0.06, -1, 0.22 + swing * 1.4 + 0.15 * sw).normalize().multiplyScalar(0.25));
+      const target = S[wk] > 0.01 && S[key] ? handDown.clone().lerp(S[key], S[wk]) : handDown;
+      if (sw > 0.5 && !tgt) target.copy(BP(sx * 0.15, L.hipSeat + 0.1, 0.25));
+      ik(sd, target, W(sx * 0.75, -0.55, -0.45).normalize());
+      if (fdir === 'down' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], wpos(B[sd + '_Hand']).add(W(0, -0.55, 1).normalize()), 0.7);
+      handPose(sd, grip * Math.max(S[wk], 0.15));
     }
-    // braço esquerdo: relaxado; ao conferir a prensa, a mão sobe um pouco à frente (gesto de checar a peça)
-    { const sl = wpos(B.L_UpperArm);
-      aim(B.L_UpperArm, B.L_Forearm, sl.clone().add(W(0.12, -1, 0.04).normalize()));
-      aim(B.L_Forearm, B.L_Hand, wpos(B.L_Forearm).add(W(0.08, -1, 0.28).normalize())); }
-    // braço direito: mistura entre "baixo" e "na tecla atual" (IK)
-    const btnP = button(), btn = btnP.clone(); btn.y = Math.min(btn.y, 1.68);
-    const nOut = V3(0.4, 0, 0.18).sub(V3(btn.x, 0, btn.z)).normalize(); // da tecla para ela (normal aproximada da face do painel)
-    const kRight = V3(0, 1, 0).cross(nOut).normalize(), kUp = V3(0, 1, 0);
-    if (op && phase === 'digitar') {
-      keyT += dt;
-      if (keyT > keyDur) { keyT = 0; keyDur = rnd(0.45, 0.9); keyI = (keyI + 1 + Math.floor(Math.random() * 3)) % KEYS.length; }
-      pressK = keyT > keyDur * 0.55 ? Math.sin(Math.min(1, (keyT - keyDur * 0.55) / (keyDur * 0.4)) * Math.PI) : 0;
-    } else { pressK = sm(pressK, 0, 8, dt); }
-    const [kx, ky] = phase === 'tela' ? [0.0, 0.02] : KEYS[keyI];
-    const keyTarget = btn.clone().addScaledVector(kRight, kx).addScaledVector(kUp, ky).addScaledVector(nOut, -0.014 * pressK);
-    if (!S.keyInit) { S.key.copy(keyTarget); S.keyInit = true; }
-    smV(S.key, keyTarget, 9, dt);
-    const fdir = V3(0.5, 0.85, -0.08).normalize();
-    const wristUp = S.key.clone().sub(fdir.clone().multiplyScalar(0.165 * HAND_K));
-    wristUp.y += Math.sin(t0 * 1.3) * 0.002;
-    const sr = wpos(B.R_UpperArm), wristDown = sr.clone().add(W(-0.06, -0.5, 0.1));
-    const wrist = wristDown.clone().lerp(wristUp, armW);
-    if (armW > 0.02) wrist.y += Math.sin(Math.PI * armW) * 0.05;            // arco natural ao subir/descer
-    ik('R', wrist, W(-0.55, -0.8, 0.15).lerp(W(-0.15, -0.2, -1), 1 - armW).normalize());
-    if (armW <= 0.35) handPose('R', 0);
-    handPose('L', 0);
-    if (armW > 0.35) {
-      aim(B.R_Hand, B.R_Finger1, S.key, Math.min(1, (armW - 0.35) / 0.4));
-      handPose('R', Math.min(1, (armW - 0.35) / 0.4));
-    }
-    // piscar (desce as pálpebras superiores ~6 mm por 0,12 s)
-    blinkT -= dt; if (blinkT < 0) { blink = 0.14; blinkT = 2.5 + Math.random() * 3.5; }
-    if (blink > 0) { blink -= dt; const k = Math.sin(Math.max(0, blink) / 0.14 * Math.PI);
+    // adereços
+    const showTray = P.tray && !!S.hL && !!S.hR && S.wL > 0.6;
+    tray.visible = showTray; if (showTray) { tray.position.copy(S.hL).add(S.hR).multiplyScalar(0.5).add(V3(0, -0.03, 0)); tray.rotation.set(0, L.head, 0); setBaked(P.baked); }
+    cup.visible = !!P.cup; pen.visible = !!P.pen;
+    book.visible = !!P.book && !!P.bookPos; if (book.visible) { book.position.copy(P.bookPos).setY(SEAT.controle + 0.2575); book.rotation.set(0, L.head + Math.PI, 0); }
+    dough.visible = !!P.dough && envCur !== 'caldeiras'; if (dough.visible) { const sq = 0.5 + 0.5 * Math.abs(Math.sin(L.actT * 2.5)); dough.position.copy(BP(0, 0.9 + 0.03, 0.44)); dough.scale.set(1 + 0.25 * sq, 0.55 - 0.12 * sq, 1.1 + 0.2 * sq); }
+    armU.uGlove.value = P.glove ? 1 : 0; armU.uGloveCol.value.set(...(P.glove === 2 ? [0.42, 0.27, 0.13] : [0.42, 0.42, 0.4]));
+    // piscar
+    S.blinkT -= dt; if (S.blinkT < 0) { S.blink = 0.14; S.blinkT = 2.5 + Math.random() * 3.5; }
+    if (S.blink > 0) { S.blink -= dt; const k = Math.sin(Math.max(0, S.blink) / 0.14 * Math.PI);
       for (const b of lidRest) { b.parent.updateWorldMatrix(true, false); const inv = b.parent.getWorldQuaternion(new THREE.Quaternion()).invert(); const s = b.parent.getWorldScale(V3()).x;
         b.position.add(V3(0, -0.0055 * k, 0.001 * k).applyQuaternion(inv).divideScalar(s)); } }
-    try { head?.update?.(dt, t); } catch (e) { /* módulo do rosto */ }
+    try { head?.update?.(dt, t); } catch (e) { /* cabelo */ }
   }
+  setStation(app?.env?.()?.stations?.[1] || 'bancada', { instant: true, act: 'A2' });
   update(0, 0);
 
-  return { group, anchors, update, setActivity(name) { activity = name; }, get phase() { return phase; },
-    setPhase(p, hold = 99) { phase = p; phaseT = 0; phaseDur = hold; },
-    debug: () => { // ponta do microfone (0,09 m acima do centro, +y local) × canal auditivo do mesmo lado (NHO-01: 100–200 mm)
-      const r = {}; for (const s of ['L', 'R']) { const a = anchors['shoulder' + s]; a.updateWorldMatrix(true, false);
-        const m = a.localToWorld(V3(0, 0.09, 0)), e = anchors['ear' + s].getWorldPosition(V3()), d = m.distanceTo(e);
-        r[s] = { mic: m.toArray().map((v) => +v.toFixed(4)), ear: e.toArray().map((v) => +v.toFixed(4)), mm: Math.round(d * 1000), zona: d >= 0.1 && d <= 0.2 }; }
-      return { mic: r.L.mic, ear: r.L.ear, d: r.L.mm / 1000, micEar_mm: r.L.mm, zonaAuditiva: r.L.zona, R: r.R }; } };
+  return { group, anchors, update, setStation, setActivity(a) { if (a === 'olhando') L.look = true; else { if (a !== L.act) L.actT = 0; L.act = a; L.look = false; if (L.mode === 'stand') startPatrol(); } },
+    get station() { return L.st; }, get activity() { return L.act; }, debug: () => ({ mode: L.mode, pos: L.pos.toArray(), head: L.head, st: L.st, act: L.act, sitW: L.sitW }) };
 }

@@ -19,7 +19,7 @@ const isForearm = (u, v) => (u < 0.222 || u > 0.778) && v > 0.27 && v < 0.5; // 
 const isRoll = (u, v) => ((u >= 0.218 && u < 0.276) || (u > 0.724 && u <= 0.782) || u < 0.056 || u > 0.944) && v > 0.25 && v < 0.54;  // manga dobrada → alisada
 
 function canvasOf(im, S) { const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d'); g.drawImage(im, 0, 0, S, S); return [c, g]; }
-function navyAtlas(im) {
+function navyAtlas(im, NAVY = [33, 48, 76], STITCH = [118, 128, 146], soft = false) {
   const S = 2048, [c, g] = canvasOf(im, S), d = g.getImageData(0, 0, S, S), p = d.data;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const i = (y * S + x) * 4, u = x / S, v = y / S, r = p[i], gg = p[i + 1], b = p[i + 2], L = lum(r, gg, b);
@@ -30,7 +30,8 @@ function navyAtlas(im) {
     } else if (isShirt(r, gg, b)) k = Math.max(0.35, Math.min(1.18, 0.95 + (L - 150) / 230));
     else if (isForearm(u, v) && r > gg && gg > b) k = 0.93 + (L - 190) / 600;    // inclusive a borda do punho (sem fresta de pele)                          // manga nova: tecido liso
     if (k < 0) continue;
-    if (k > 1.6) { p[i] = 118; p[i + 1] = 128; p[i + 2] = 146; continue; }
+    if (soft && k <= 1.6) k = 0.66 + 0.36 * k;
+    if (k > 1.6) { p[i] = STITCH[0]; p[i + 1] = STITCH[1]; p[i + 2] = STITCH[2]; continue; }
     p[i] = sat(NAVY[0] * k); p[i + 1] = sat(NAVY[1] * k); p[i + 2] = sat(NAVY[2] * k);
   }
   g.putImageData(d, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
@@ -125,10 +126,11 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   const restOf = (name) => { const i = sk01.bones.findIndex((b) => b.name === name); if (i < 0) return null;
     const m = sk01.boneInverses[i].clone().invert(); return new THREE.Vector3().setFromMatrixPosition(m); }; // espaço de bind já é y-cima (= vRest)
   const sh = restOf('Bip01_L_UpperArm') || new THREE.Vector3(17, 138, -6), el = restOf('Bip01_L_Forearm') || new THREE.Vector3(36, 121, -6);
-  const U = { uLogo: { value: logoTex() }, uPk: { value: pk }, uSh: { value: sh }, uEl: { value: el } };
-  const mat = inject(new THREE.MeshPhysicalMaterial({ map: navyAtlas(colI), normalMap: new THREE.CanvasTexture(nrmI), normalScale: new THREE.Vector2(0.8, 0.8),
+  const U = { uLogo: { value: logoTex() }, uPk: { value: pk }, uSh: { value: sh }, uEl: { value: el }, uLogoOn: { value: 1 }, uDust: { value: new THREE.Color(0.22, 0.2, 0.18) }, uDustK: { value: 0.35 } };
+  const texNavy = navyAtlas(colI), texWhite = navyAtlas(colI, [242, 241, 236], [214, 212, 204], true);
+  const mat = inject(new THREE.MeshPhysicalMaterial({ map: texNavy, normalMap: new THREE.CanvasTexture(nrmI), normalScale: new THREE.Vector2(0.8, 0.8),
     roughnessMap: rough(spcI), roughness: 1, metalness: 0, sheen: 0.5, sheenColor: new THREE.Color(0x8a9ab8), sheenRoughness: 0.6, specularIntensity: 0.3, side: THREE.DoubleSide }), {
-    decl: NOISE + `\nuniform sampler2D uLogo; uniform vec3 uPk, uSh, uEl;
+    decl: NOISE + `\nuniform sampler2D uLogo; uniform vec3 uPk, uSh, uEl; uniform float uLogoOn, uDustK; uniform vec3 uDust;
       float twill(vec3 p) { return p.x * 0.7 + p.y + p.z * 0.7; }`,
     color: `{ vec3 q = vRest;
       // sarja: listras diagonais finas (some com a distância → sem moiré)
@@ -139,10 +141,10 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
       float dust = smoothstep(40.0, 10.0, q.y) * (0.55 + 0.45 * vn(q * 0.9)) * 0.4;
       dust += smoothstep(5.0, 0.0, length(vec2(abs(q.x) - 9.5, q.y - 48.0) * vec2(0.9, 0.55))) * step(0.0, q.z) * 0.35 * vn(q * 1.7);
       dust = clamp(dust * (0.6 + 0.8 * vn(q * 4.0)), 0.0, 0.6);
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.2, 0.18), dust * 0.35);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uDust, dust * uDustK);
       // bordado no bolso do peito esquerdo (projeção frontal)
       vec2 lp = vec2(q.x - uPk.x, q.y - (uPk.y - 0.4)) / vec2(5.2, 5.2) + 0.5;
-      if (q.z > uPk.z - 4.0 && lp.x > 0.0 && lp.x < 1.0 && lp.y > 0.0 && lp.y < 1.0) {
+      if (uLogoOn > 0.5 && q.z > uPk.z - 4.0 && lp.x > 0.0 && lp.x < 1.0 && lp.y > 0.0 && lp.y < 1.0) {
         vec4 L = texture2D(uLogo, vec2(lp.x, 1.0 - lp.y)); float th = 0.92 + 0.16 * sin((lp.x + lp.y) * 140.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, L.rgb * th, L.a); wMask = L.a; }
       // emblema na manga (face externa do braço, 1/3 abaixo do ombro), nos dois braços
@@ -150,7 +152,7 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
       vec3 lat = normalize(vec3(-ax.y, ax.x, 0.0)); if (lat.y < 0.0) lat = -lat;
       vec3 c0 = uSh + ax * 0.33; vec3 dv = pa - c0; vec3 an = normalize(ax);
       vec2 ep = vec2(dot(dv, vec3(0.0, 0.0, 1.0)) * sign(q.x), -dot(dv, an)) / 6.4 + 0.5;
-      if (dot(dv, lat) > 0.5 && s > 0.1 && s < 0.6 && ep.x > 0.0 && ep.x < 1.0 && ep.y > 0.0 && ep.y < 1.0) {
+      if (uLogoOn > 0.5 && dot(dv, lat) > 0.5 && s > 0.1 && s < 0.6 && ep.x > 0.0 && ep.x < 1.0 && ep.y > 0.0 && ep.y < 1.0) {
         vec4 L = texture2D(uLogo, vec2(ep.x, 1.0 - ep.y)); float th = 0.92 + 0.16 * sin((ep.x - ep.y) * 160.0);
         diffuseColor.rgb = mix(diffuseColor.rgb, L.rgb * th, L.a); wMask = max(wMask, L.a); } }`,
     rough: 'roughnessFactor = mix(clamp(roughnessFactor, 0.78, 1.0), 0.6, wMask * 0.6);',
@@ -164,5 +166,7 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   m01.matrixWorld.decompose(mesh.position, mesh.quaternion, mesh.scale);
   fbx.add(mesh); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(mapped, inv), G.clone().multiply(m01.bindMatrix));
-  return { mesh, pants: true, sleeves: true };
+  const setEnv = (env) => { const w = env === 'fornos'; mat.map = w ? texWhite : texNavy; U.uLogoOn.value = w ? 0 : 1;
+    U.uDust.value.set(...(w ? [0.93, 0.88, 0.76] : [0.06, 0.055, 0.05])); U.uDustK.value = w ? 0.5 : 0.45; mat.sheenColor.set(w ? 0xffffff : 0x8a9ab8); mat.needsUpdate = true; };
+  return { mesh, pants: true, sleeves: true, setEnv };
 }

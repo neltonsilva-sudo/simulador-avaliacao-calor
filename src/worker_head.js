@@ -156,6 +156,7 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
     add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V3(-(RX - 0.01), -0.004, -0.04), V3(-(RX - 0.022), -0.026, nz * 0.8), V3(0, -0.034, nz), V3(RX - 0.022, -0.026, nz * 0.8), V3(RX - 0.01, -0.004, -0.04)]), 24, 0.0055, 5), susM), helmet);
     const ratchet = add(new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.011, 16), susM), helmet); ratchet.rotation.x = Math.PI / 2; ratchet.position.set(0, -0.034, nz - 0.006);
   }
+  let helmetStrap = null;
   // jugular preta com estampa amarela, solta: desce atrás da orelha e passa pela nuca (como na foto, sem cruzar o queixo)
   {
     const [jc, jg] = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 32; return [c, c.getContext('2d')]; })();
@@ -167,8 +168,9 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
     const ez = (ear[1].c.z + ear[-1].c.z) / 2, sx = (s) => s * (Math.max(ear[1].out, ear[-1].out) + 0.005);
     const pts = []; for (const s of [-1, 1]) { const side = [V3(sx(s) * 0.97, 0.034, ez - 0.026), V3(sx(s) * 1.01, 0.0, ez - 0.034), V3(sx(s) * 0.98, -0.04, ez - 0.05), V3(s * 0.06, -0.085, zB + 0.06)]; pts.push(...(s < 0 ? side : side.reverse())); }
     pts.splice(4, 0, V3(0, -0.098, zB + 0.07));
-    add(new THREE.Mesh(ribbon(THREE, new THREE.CatmullRomCurve3(pts), 0.013, 0.0016, 120), strapM)).castShadow = true;
-    const buckle = add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.005), new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.5 }))); buckle.position.set(-0.045, -0.088, zB + 0.062); buckle.rotation.set(0, -0.6, -0.5);
+    const jug = add(new THREE.Group()); jug.name = 'jugular'; helmetStrap = jug;
+    add(new THREE.Mesh(ribbon(THREE, new THREE.CatmullRomCurve3(pts), 0.013, 0.0016, 120), strapM), jug).castShadow = true;
+    const buckle = add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.012, 0.005), new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.5 })), jug); buckle.position.set(-0.045, -0.088, zB + 0.062); buckle.rotation.set(0, -0.6, -0.5);
   }
 
   // ── óculos de segurança incolores envolventes ──
@@ -244,7 +246,7 @@ export async function buildHead({ THREE, stage, app, root, skinned, bones, headB
 
   function update(dt, t) { hair.update(dt, t); }
 
-  return { replaces: ['helmet', 'glasses', 'earplugs', 'hair'], update, anchors, frame, parts: { helmet, glasses, hair: hair.group }, debug: dbg };
+  return { replaces: ['helmet', 'glasses', 'earplugs', 'hair'], update, anchors, frame, parts: { helmet, glasses, hair: hair.group, strap: helmetStrap }, debug: dbg };
 }
 
 // fita plana ao longo de uma curva (largura w, espessura h); side = direção preferida da normal da fita
