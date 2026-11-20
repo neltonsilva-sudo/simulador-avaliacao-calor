@@ -10,7 +10,7 @@ const F = {
   mono: '"Roboto Mono", Menlo, Consolas, monospace',
 };
 const C = {
-  bg0: '#06080c', bg1: '#020305', white: '#f3f5f9', txt: '#dfe7f3', val: '#d4e1f6', dim: '#8d9ab0', faint: '#4a566c',
+  bg0: '#080a0f', bg1: '#040508', white: '#f3f5f9', txt: '#dfe7f3', val: '#d4e1f6', dim: '#8d9ab0', faint: '#4a566c',
   blue: '#3a7af2', blueHi: '#6aa0ff', blueDk: '#1d4fc4', navy: '#0b1f52', sq: '#3d72e8', red: '#ef3b32', amber: '#ffb72e',
   green: '#3fd14a', warn: '#ffb72e', err: '#ff5a4a', sel0: '#3a7cf4', sel1: '#2257d6',
 };
@@ -424,6 +424,34 @@ export function createLCD() {
     }
   }
 
+  /** acabamento de TFT real: vazamento da retroiluminação nas bordas/cantos (IPS glow), variação de ângulo de visão
+   *  (topo levemente lavado, base mais densa) e, em escala alta (close), a grade de pixels/subpixels do painel 320×240. */
+  function tftFinish(scale, s) {
+    if (s.power === 'off') return;
+    const k = s.power === 'shutdown' ? Math.max(0, 1 - s.offT / OFF_S) : 1;
+    X.save(); X.globalAlpha = k; X.globalCompositeOperation = 'screen';
+    // sangramento nas bordas: faixa fina azulada + cantos inferiores mais claros (difusor)
+    const e = X.createLinearGradient(0, 0, 0, LH); e.addColorStop(0, 'rgba(70,90,130,0.10)'); e.addColorStop(0.06, 'rgba(70,90,130,0)');
+    e.addColorStop(0.92, 'rgba(70,90,130,0)'); e.addColorStop(1, 'rgba(80,100,140,0.14)'); X.fillStyle = e; X.fillRect(0, 0, LW, LH);
+    const sx = X.createLinearGradient(0, 0, LW, 0); sx.addColorStop(0, 'rgba(70,90,130,0.09)'); sx.addColorStop(0.04, 'rgba(70,90,130,0)');
+    sx.addColorStop(0.96, 'rgba(70,90,130,0)'); sx.addColorStop(1, 'rgba(70,90,130,0.09)'); X.fillStyle = sx; X.fillRect(0, 0, LW, LH);
+    for (const [cx, cy, a] of [[0, LH, 0.09], [LW, LH, 0.08], [0, 0, 0.035], [LW, 0, 0.04]]) {
+      const r = X.createRadialGradient(cx, cy, 0, cx, cy, 70); r.addColorStop(0, `rgba(95,110,150,${a})`); r.addColorStop(1, 'rgba(95,110,150,0)');
+      X.fillStyle = r; X.fillRect(0, 0, LW, LH);
+    }
+    // ângulo de visão: de cima para baixo o contraste muda um pouco
+    const v = X.createLinearGradient(0, 0, 0, LH); v.addColorStop(0, 'rgba(120,130,150,0.035)'); v.addColorStop(0.5, 'rgba(120,130,150,0)'); X.fillStyle = v; X.fillRect(0, 0, LW, LH);
+    X.restore();
+    if (scale >= 3.5) { // grade de pixels (só em alta escala; em 2× geraria moiré)
+      X.save(); X.globalAlpha = 0.16 * k; X.fillStyle = '#000';
+      const px = 1 / scale; // 1 px do contexto
+      for (let x = 1; x < LW; x++) X.fillRect(x - px * 0.6, 0, px * 0.9, LH);
+      for (let y = 1; y < LH; y++) X.fillRect(0, y - px * 0.6, LW, px * 0.9);
+      X.globalAlpha = 0.05 * k; // divisão de subpixels R|G|B
+      for (let x = 0; x < LW; x++) { X.fillRect(x + 1 / 3 - px * 0.3, 0, px * 0.6, LH); X.fillRect(x + 2 / 3 - px * 0.3, 0, px * 0.6, LH); }
+      X.restore();
+    }
+  }
   /** desenha o estado completo do aparelho num contexto qualquer, com px de ctx por px lógico = scale */
   function drawTo(ctx, scale, s, core) {
     X = ctx; X.save(); X.setTransform(scale, 0, 0, scale, 0, 0);
@@ -437,6 +465,7 @@ export function createLCD() {
       else mainScreen(s, core);
       overlays(s);
     }
+    tftFinish(scale, s);
     const b = s.settings.brightness;
     if (b < 5) { X.fillStyle = `rgba(0,0,0,${(5 - b) * 0.16})`; X.fillRect(0, 0, LW, LH); }
     X.restore(); X = ctx0;

@@ -276,3 +276,31 @@ input[type=range] { accent-color:var(--acc); }
 .env-card.on { border-color:rgba(255,150,90,.75); background:linear-gradient(180deg,rgba(255,138,76,.22),rgba(226,83,28,.12)); }
 .env-card b { font-size:13.5px; } .env-card span { font-size:11.5px; color:#aab3bd; }
 @media (max-width:760px) { .env-pick { grid-template-columns:1fr 1fr; margin-top:8px; } .env-card { padding:7px 10px; } .env-card span { display:none; } .ui-seg.env { order:8; } }
+
+/* ── 📝 atividade (ui_atividade.js) ── */
+.ativ-on .ui-side, .ativ-on .ui-steps { display:none !important; }
+.ativ-panel { position:absolute; left:16px; top:78px; width:min(440px, calc(100vw - 32px)); max-height:calc(100vh - 78px - 96px); display:flex; flex-direction:column; padding:10px 14px 10px; box-sizing:border-box; z-index:3; }
+.ativ-h { display:flex; justify-content:space-between; align-items:center; font:700 11px "Roboto Condensed",sans-serif; letter-spacing:.1em; text-transform:uppercase; color:#ffc39e; }
+.ativ-case { font-size:12.5px; line-height:1.5; color:#d4dbe1; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:8px 10px; margin:8px 0; }
+.ativ-tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.ativ-tabs button { flex:1 1 auto; padding:6px 8px; border-radius:9px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04); color:#c9d1d8; font-size:12px; font-weight:600; cursor:pointer; }
+.ativ-tabs button.on { background:rgba(255,138,76,.22); border-color:rgba(255,150,90,.6); color:#fff; }
+.ativ-guia { font-size:12.5px; line-height:1.5; color:#ffe9c7; background:rgba(245,181,74,.1); border:1px solid rgba(245,181,74,.35); border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+.ativ-body { overflow:auto; padding-right:4px; scrollbar-width:thin; }
+.ativ-act { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:4px 0 8px; }
+.ativ-obs { margin:4px 0 6px; padding-left:18px; font-size:12.5px; color:#d4dbe1; }
+.ativ-posto { padding:8px 10px; margin:0 0 8px; border-radius:11px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); font-size:12.5px; }
+.ativ-posto.here { border-color:rgba(255,150,90,.6); }
+.ativ-row { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; margin:6px 0; } .ativ-row.ori { flex-direction:column; align-items:flex-start; gap:3px; }
+.ativ-panel input[inputmode] { width:70px; font:600 13px "Roboto Mono",monospace; color:#fff; background:#1b1e23; border:1px solid rgba(255,255,255,.16); border-radius:8px; padding:5px 7px; margin-left:4px; }
+.ativ-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:6px; font-size:12px; color:#c9d1d8; } .ativ-grid.two { grid-template-columns:1fr; }
+.ativ-grid.two input[inputmode] { width:100px; }
+.ativ-sheet tbody tr { cursor:pointer; } .ativ-sheet tbody tr:hover td { background:rgba(255,255,255,.06); }
+.ativ-foot { display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px solid var(--line); }
+.ativ-choose .ativ-name { display:grid; gap:4px; font-size:12.5px; color:#c9d1d8; margin:8px 0; } .ativ-choose .ativ-name input { font:500 14px "Inter",sans-serif; color:#fff; background:#1b1e23; border:1px solid rgba(255,255,255,.18); border-radius:9px; padding:8px 10px; }
+.ativ-opt { display:grid; gap:4px; margin:10px 0; font-size:13px; } .ativ-opt > span { font:700 11px "Roboto Condensed",sans-serif; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); }
+.boletim h1 { font-size:22px; }
+@media (max-width:760px) { .ativ-panel { left:8px; right:8px; width:auto; top:58px; max-height:46vh; } }
+.ativ-on .lv-campo, .ativ-on .lv-field { display:none !important; }
+body:not([data-ui-phase="explorar"]) .pst { display:none !important; }
+.ativ-prova .lv-warn { display:none !important; } /* avaliação: o aluno descobre as armadilhas inspecionando */

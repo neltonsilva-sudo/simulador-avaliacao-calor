@@ -29,6 +29,11 @@ const PANEL_Z = ZF + 1.0;                   // frente do painel
 // relevo procedural do corpo (mm, espaço do objeto): linha de partição frontal, friso lateral, pontos de pega, ícone sem fio,
 // estrias da ponta esquerda. Normal perturbada por gradiente de superfície (independe da resolução) + oclusão das ranhuras.
 const BODY_GLSL = /* glsl */`
+float gDust = 0.0;
+float bh3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float bn3(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(bh3(i), bh3(i + vec3(1,0,0)), f.x), mix(bh3(i + vec3(0,1,0)), bh3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(bh3(i + vec3(0,0,1)), bh3(i + vec3(1,0,1)), f.x), mix(bh3(i + vec3(0,1,1)), bh3(i + vec3(1,1,1)), f.x), f.y), f.z); }
 varying vec3 vLoc; varying vec3 vLocN; varying vec3 vUpV; varying vec3 vRtV;
 uniform sampler2D uEmb;
 float gr(float d, float w) { return exp(-d * d / (w * w)); }
@@ -57,6 +62,17 @@ float bodyH(vec3 p, vec3 n, out float cav, out vec2 tilt) {
   if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { float e = texture2D(uEmb, vec2(uv.x, 1.0 - uv.y)).r; h += wF * 0.45 * e; }
   // friso de partição das duas metades da carcaça (laterais, topo e base)
   float gs = gr(p.z + 6.0, 0.48); h -= wS * 0.5 * gs; cav += wS * gs * 0.85;
+  // rebarba fina do molde junto ao friso de partição
+  h += wS * 0.12 * gr(p.z + 5.15, 0.16);
+  // oclusão de contato: em volta das bossas dos sensores (topo) e da borda do painel (frente)
+  float wT = smoothstep(0.5, 0.85, n.y);
+  float eb = min(min(length(vec2((p.x - (${GX.toFixed(1)})) / 12.5, p.z / 10.0)), length(vec2((p.x - ${DRY_X.toFixed(1)}) / 11.8, p.z / 9.6))), length(vec2((p.x - ${WET_X.toFixed(1)}) / 11.8, p.z / 9.6)));
+  cav += wT * (1.0 - smoothstep(0.92, 1.45, eb)) * 0.6;
+  vec2 q2 = abs(p.xy - vec2(${PANEL.x.toFixed(1)}, ${PANEL.y.toFixed(1)})) - vec2(${(PANEL.w / 2 - 6).toFixed(2)}, ${(PANEL.h / 2 - 6).toFixed(2)});
+  float dp = length(max(q2, 0.0)) + min(max(q2.x, q2.y), 0.0) - 6.0;
+  cav += wF * step(0.0, dp) * (1.0 - smoothstep(0.0, 2.4, dp)) * 0.5;
+  // poeira leve: superfícies voltadas para cima e reentrâncias
+  gDust = clamp(wT * (0.25 + 0.75 * bn3(p * 0.12)) * 0.7 + cav * 0.45, 0.0, 1.0) * (0.55 + 0.45 * bn3(p * 0.9));
   cav *= aa; tilt *= mix(0.6, 1.0, aa); return h * aa;
 }`;
 function bodyDetail(mat) {
@@ -74,10 +90,11 @@ function bodyDetail(mat) {
         vec3 grad = (dFdx(hh) * r1 + dFdy(hh) * r2) / det;
         normal = normalize(normal - grad + vUpV * tilt.y + vRtV * tilt.x);
         diffuseColor.rgb *= 1.0 - 0.55 * clamp(cav, 0.0, 1.0);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.30, 0.31, 0.32), 0.13 * gDust); roughnessFactor = min(1.0, roughnessFactor + 0.12 * gDust);
         roughnessFactor = min(1.0, roughnessFactor + 0.1 * clamp(cav, 0.0, 1.0)); }`)
       .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n gl_FragColor.rgb *= mix(0.3, 1.0, smoothstep(0.0, 9.0, vLoc.y));');
   };
-  mat.customProgramCacheKey = () => 'meterBody3';
+  mat.customProgramCacheKey = () => 'meterBody4';
   return mat;
 }
 /** "casca de laranja" sutil da pintura do globo: relevo procedural 3D (sem UV → sem arcos), some com a distância */
@@ -114,7 +131,7 @@ function globePeel(mat) {
                    mix(mix(gh3(i + vec3(0,0,1)), gh3(i + vec3(1,0,1)), f.x), mix(gh3(i + vec3(0,1,1)), gh3(i + vec3(1,1,1)), f.x), f.y), f.z); }`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
       { vec3 wn = (vec4(normal, 0.0) * viewMatrix).xyz; float dn = clamp(-wn.y, 0.0, 1.0);
-        totalEmissiveRadiance += vec3(0.030, 0.033, 0.037) * (0.35 + 0.65 * dn) * dn; }`)
+        totalEmissiveRadiance += vec3(0.055, 0.06, 0.066) * (0.35 + 0.65 * dn) * dn; }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
       { float fw = length(fwidth(vGp)); float aa = clamp(1.6 - fw * 1.2, 0.0, 1.0);
         float hh = (gn3(vGp * 0.75) * 0.6 + gn3(vGp * 1.9) * 0.4) * 0.035 * aa * 0.001;
@@ -142,8 +159,8 @@ export function buildMeter(stage, fw, app) {
 
   // ── materiais ──
   const rm = rubberMaps(), pm = powderMaps(), km = knurlMaps(), wm = wickMaps();
-  const bodyMat = bodyDetail(new THREE.MeshPhysicalMaterial({ color: 0x0a8cff, roughness: 0.42, roughnessMap: repeat(rm.rough, 1 / 70), normalMap: repeat(rm.normal, 1 / 11), normalScale: new THREE.Vector2(0.45, 0.45),
-    sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0x3d8bff), specularIntensity: 0.9, clearcoat: 0.1, clearcoatRoughness: 0.4 }));
+  const bodyMat = bodyDetail(new THREE.MeshPhysicalMaterial({ color: 0x0a8cff, roughness: 0.56, roughnessMap: repeat(rm.rough, 1 / 70), normalMap: repeat(rm.normal, 1 / 20), normalScale: new THREE.Vector2(0.5, 0.5),
+    sheen: 0.3, sheenRoughness: 0.45, sheenColor: new THREE.Color(0x3d8bff), specularIntensity: 0.85 }));
   const panelMat = new THREE.MeshPhysicalMaterial({ color: 0x030304, roughness: 0.07, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.035, specularIntensity: 0.8 });
   const blackRub = new THREE.MeshStandardMaterial({ color: 0x0f1011, roughness: 0.8, normalMap: repeat(rm.normal, 1 / 6), normalScale: new THREE.Vector2(0.4, 0.4) });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xe4e6e9, roughness: 0.16, metalness: 1, normalMap: repeat(km.normal, 3, 3.5), normalScale: new THREE.Vector2(0.55, 0.55) });
@@ -182,7 +199,7 @@ export function buildMeter(stage, fw, app) {
   // visor em alta resolução (fw.drawHi) enquanto o aparelho está na vitrine
   let hiCv = null, hiCtx = null, hiTex = null;
   if (fw?.drawHi) { hiCv = document.createElement('canvas'); hiCv.width = 1280; hiCv.height = 960; hiCtx = hiCv.getContext('2d'); hiTex = new THREE.CanvasTexture(hiCv); hiTex.colorSpace = THREE.SRGBColorSpace; hiTex.anisotropy = screenTex?.anisotropy || 16; }
-  const screenMat = new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.025, emissive: 0xffffff, emissiveMap: screenTex, emissiveIntensity: screenTex ? 1.05 : 0 });
+  const screenMat = new THREE.MeshPhysicalMaterial({ color: 0x000000, roughness: 0.2, clearcoat: 1, clearcoatRoughness: 0.025, emissive: 0xffffff, emissiveMap: screenTex, emissiveIntensity: screenTex ? 1.3 : 0, toneMapped: false }); // branco do TFT sem acinzentar no tonemap
   const screen = add(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), screenMat, D, false); screen.name = 'visor';
   screen.position.set(SCREEN.x, SCREEN.y, PANEL_Z + 0.04); screen.userData.noBloom = false;
   // nome do modelo "iTemp" serigrafado (sem logotipo de fabricante)
@@ -199,7 +216,7 @@ export function buildMeter(stage, fw, app) {
   })();
   const keys = {}, keyRest = {}, keyOutline = {};
   for (const k of ['power', 'play', 'stop', 'menu']) {
-    const m = add(keyGeo, new THREE.MeshPhysicalMaterial({ map: keyTex(k), roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3, sheen: 0.25, sheenColor: new THREE.Color(0x9fd0ff) }));
+    const m = add(keyGeo, new THREE.MeshPhysicalMaterial({ map: keyTex(k), bumpMap: keyTex(k), bumpScale: 0.7, roughness: 0.42, clearcoat: 0.3, clearcoatRoughness: 0.35, sheen: 0.45, sheenRoughness: 0.35, sheenColor: new THREE.Color(0x9fd0ff), emissive: 0x0b3a6e, emissiveIntensity: 0.12 }));
     m.position.set(KEY_X, KEY_Y[k], PANEL_Z); m.userData.key = k; m.name = 'tecla_' + k; keys[k] = m; keyRest[k] = PANEL_Z;
     keyOutline[k] = outlineOf(m, 0.8);
   }
@@ -288,7 +305,16 @@ export function buildMeter(stage, fw, app) {
   // ponta do pavio: tecido dobrado e amarrado, fibras soltas (irregular)
   const tipG = new THREE.IcosahedronGeometry(1, 3); { const P = tipG.attributes.position; for (let i = 0; i < P.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(P, i); const n = 1 + 0.07 * (h2(Math.round(v.x * 7), Math.round(v.y * 7), Math.round(v.z * 7)) - 0.5) + 0.08 * Math.sin(v.y * 9 + v.x * 5); v.multiplyScalar(n); P.setXYZ(i, v.x * 5.0 + v.y * 1.2 + (WTOP - RIM_Y) * 0.012, v.y * 4.2 + WTOP + 1.0, v.z * 4.3); } tipG.computeVertexNormals(); }
   const tipMat = new THREE.MeshPhysicalMaterial({ color: 0xf4efe2, roughness: 0.9, sheen: 1, sheenRoughness: 0.4, sheenColor: new THREE.Color(0xfff7e8), normalMap: repeat(wm.normal, 2, 2), normalScale: new THREE.Vector2(1.2, 1.2) });
-  const wickTip = add(tipG, tipMat, wickG); wickTip.name = 'pavio_ponta';
+  { // fiapos soltos na ponta do pavio
+    const fib = [tipG];
+    for (let k = 0; k < 9; k++) { const a = h2(k, 1, 9) * Math.PI * 2, el = 0.35 + 0.6 * h2(k, 2, 9), L = 2.5 + 4 * h2(k, 3, 9);
+      const o = new THREE.Vector3(Math.cos(a) * 3.6 + (WTOP - RIM_Y) * 0.012, WTOP + 2.0 + 1.5 * h2(k, 4, 9), Math.sin(a) * 3.2);
+      const d = new THREE.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el));
+      const c = new THREE.QuadraticBezierCurve3(o, o.clone().addScaledVector(d, L * 0.6), o.clone().addScaledVector(d, L).add(new THREE.Vector3(0, -L * 0.35, 0)));
+      fib.push(new THREE.TubeGeometry(c, 6, 0.09 + 0.05 * h2(k, 5, 9), 4, false)); }
+    tipG.dispose(); var tipAll = merge(fib);
+  }
+  const wickTip = add(tipAll, tipMat, wickG); wickTip.name = 'pavio_ponta';
 
   // sombra de contato (oclusão suave sob a base) — só quando o aparelho está apoiado na vitrine/mesa, fora do tripé
   const blobTex = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 192; const g = c.getContext('2d');
@@ -421,9 +447,12 @@ export function buildMeter(stage, fw, app) {
   }
 
   // ── atualização por quadro ──
+  const _camP = new THREE.Vector3();
   function update(dt = 0.016) {
     dt = Math.min(dt, 0.1);
-    const inShow = !!device.parent && device.parent === app?.anchors?.presentDevice;
+    // visor em alta resolução na vitrine OU quando a câmera chega perto (< 0,8 m) do aparelho
+    device.getWorldPosition(_camP); const near = stage.camera.position.distanceTo(_camP) < 0.8;
+    const inShow = (!!device.parent && device.parent === app?.anchors?.presentDevice) || near;
     const wantTex = inShow && hiTex ? hiTex : screenTex;
     if (wantTex && screenMat.emissiveMap !== wantTex) { screenMat.emissiveMap = wantTex; if (wantTex === hiTex) fw.dirty = true; }
     if (screenTex && fw?.dirty) { if (wantTex === hiTex) { try { fw.drawHi(hiCtx, 4); } catch (e) { console.error('[meter] drawHi', e); } hiTex.needsUpdate = true; } else screenTex.needsUpdate = true; fw.dirty = false; }

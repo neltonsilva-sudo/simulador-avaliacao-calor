@@ -5,6 +5,7 @@ import { STEPS, CHAPTERS, CAPTIONS, fwDo, demoClock, camPart, isOn, isRec, mesaV
 import { createVoice } from './ui_voice.js';
 import { createMeasure, SIT_COLOR } from './ui_measure.js';
 import { createEval, RESULT_STEPS } from './ui_eval.js';
+import { createActivity } from './ui_atividade.js';
 
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 const f = (v, d = 1) => (v == null || !isFinite(v) ? '—' : v.toFixed(d).replace('.', ','));
@@ -255,16 +256,17 @@ export function createUI(root, app) {
     const p = S.phase; drawSteps();
     envSw.innerHTML = `${app.env?.()?.short || 'Sala de fornos'} <i>⇄</i>`; envSw.style.display = app.ENVS ? '' : 'none';
     const changed = p !== lastPhase; lastPhase = p;
-    root.dataset.phase = p;
+    root.dataset.phase = p; document.body.dataset.uiPhase = p; // o painel "Postos de trabalho" (.pst) só aparece no Explorar
     const showSide = ['apresentacao', 'montagem', 'posicionar', 'medicao', 'cronometragem', 'resultado'].includes(p);
     side.classList.toggle('hidden', !showSide); side.classList.toggle('wide', ['cronometragem', 'resultado'].includes(p));
-    lcdWrap.classList.toggle('hidden', !['apresentacao', 'montagem', 'posicionar', 'medicao'].includes(p));
+    lcdWrap.classList.toggle('hidden', !['apresentacao', 'montagem', 'posicionar', 'medicao', 'atividade'].includes(p));
     if (changed && narrow()) for (const el of [side, lcdWrap, live]) if (!el.dataset.user) el.classList.toggle('collapsed', !(el === side && ['posicionar', 'medicao', 'cronometragem', 'resultado'].includes(p)));
     if (changed && p !== 'laudo') { modal.classList.add('hidden'); document.body.classList.remove('laudo-open'); }
     if (showSide) refreshPanel();
     if (p === 'explorar') {
       setBar([soundBtn(), viewSeg(), btn(S.running ? '❙❙ Jornada' : '▶ Jornada', 'ghost', () => { app.run(!S.running); render(); }, 'A forneira segue o ciclo de trabalho em tempo acelerado'),
-        btn('🎓 Demonstração', '', openChooser), btn('<span class="ic">◉</span> Medidor de IBUTG', 'primary big', () => startPresentation('tudo'))]);
+        btn('🎓 Demonstração', '', openChooser), btn('📝 Atividade', '', () => ativ.open(), 'O aluno faz a avaliação sozinho (guiada ou avaliação)'),
+        btn('<span class="ic">◉</span> Medidor de IBUTG', 'primary big', () => startPresentation('tudo'))]);
     } else if (p === 'apresentacao' || p === 'montagem') {
       setBar([soundBtn(), btn('◀', '', () => goStep(stepIdx - 1), 'Passo anterior'), btn('Próximo ▶', 'primary', () => goStep(stepIdx + 1)),
         btn(demoClock.paused ? '▶ Continuar' : '❙❙ Pausar', 'ghost' + (demoClock.paused ? ' on' : ''), toggleDemoPause),
@@ -292,6 +294,9 @@ export function createUI(root, app) {
     } else if (p === 'resultado') {
       setBar([soundBtn(), btn('◀ Cronometragem', 'ghost', () => { stopResult(); voice.stop(); app.setPhase('cronometragem'); }), btn('▶ Explicar passo a passo', '', () => explainResult()),
         btn('📄 Laudo', 'primary big', () => go('laudo'))]);
+    } else if (p === 'atividade') {
+      setBar([soundBtn(), viewSeg(), speedSeg(), btn(S.running ? '❙❙ Pausar' : '▶ Continuar', 'ghost', () => { if (!S.running && !ativ.A?.sheets?.[ativ.A?.cur]) return toast('Inicie as leituras pelo painel da atividade.'); app.run(!S.running); render(); }),
+        btn('✕ Sair da atividade', 'ghost', () => ativ.exit())]);
     } else if (p === 'laudo') {
       setBar([soundBtn(), btn('◀ Resultado', 'ghost', () => { modal.classList.add('hidden'); document.body.classList.remove('laudo-open'); app.setPhase('resultado'); }),
         btn('📄 Abrir laudo', 'primary', showLaudo), btn('↺ Nova avaliação', 'ghost', () => location.reload())]);
@@ -299,6 +304,8 @@ export function createUI(root, app) {
     requestAnimationFrame(() => layout());
   }
   Object.assign(uiApi, { render, refreshPanel, caption, hideCaption, say: (t) => say(t), toast });
+  uiApi.voice = voice;
+  const ativ = createActivity({ app, ui: uiApi, ev, root, h });
 
   // ── atualização contínua: cartão do ambiente, visor ──
   function liveHTML() {
@@ -354,8 +361,9 @@ export function createUI(root, app) {
     }
     side.style.top = ''; side.style.maxHeight = ''; live.style.top = '';
     lcdWrap.style.top = (live.offsetTop + live.offsetHeight + 10) + 'px';
-    if (vis(side) && !side.classList.contains('collapsed')) {
-      const r = side.offsetLeft + side.offsetWidth + 14, w = Math.min(720, innerWidth - r - 16);
+    const ap = root.querySelector('.ativ-panel:not(.hidden)'), lp = ap || (vis(side) && !side.classList.contains('collapsed') ? side : null);
+    if (lp) {
+      const r = lp.offsetLeft + lp.offsetWidth + 14, w = Math.min(720, innerWidth - r - 16);
       cap.style.left = r + Math.max(0, (innerWidth - r - 16 - w) / 2) + 'px'; cap.style.width = w + 'px'; cap.style.transform = 'none';
     } else { cap.style.left = ''; cap.style.width = ''; cap.style.transform = ''; }
   }
@@ -367,6 +375,6 @@ export function createUI(root, app) {
   app.on('ready', () => { curView = new URLSearchParams(location.search).get('cam') || app.env?.()?.ref || null; if (S.phase === 'explorar' && new URLSearchParams(location.search).get('ui') !== '0') { const c = capt('inicio'); caption(c.title, c.text + envChoiceHTML()); bindEnvChoice(); } render(); });
   app.on('env', () => render());
   render(); layout();
-  return { setEnv, render, refreshPanel, caption, say: (t) => say(t), voice, go, startPresentation, finishPresentation, goStep, explainResult, showLaudo, measure, eval: ev, data: D, toast,
+  return { ativ, setEnv, render, refreshPanel, caption, say: (t) => say(t), voice, go, startPresentation, finishPresentation, goStep, explainResult, showLaudo, measure, eval: ev, data: D, toast,
     get stepIdx() { return stepIdx; }, get steps() { return steps; } };
 }

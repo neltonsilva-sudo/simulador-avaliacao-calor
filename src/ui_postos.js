@@ -20,7 +20,7 @@ const CSS = `
 
 export function createPostosUI(app) {
   const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-  const el = document.createElement('div'); el.className = 'pst min'; document.body.appendChild(el);
+  const el = document.createElement('div'); el.className = 'pst min'; (document.getElementById('ui') || document.body).appendChild(el); // some com ?ui=0
   const base = () => app.CY.CYCLES[app.state.env];
   const fmt = (m) => (Math.round(m * 10) / 10).toString().replace('.', ',');
   function render() {
