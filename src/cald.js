@@ -21,7 +21,7 @@ function makeMaterials(stage) {
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   const paint = (color, rough = 1, o = {}) => std({ color, roughness: rough, roughnessMap: pt.rough, map: pt.map, normalMap: pt.normal, normalScale: N(0.35), metalness: 0.05, ...o });
   const M = {
-    clad: std({ color: 0xedf0f2, metalness: 1, roughness: 0.62, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
+    clad: std({ color: 0xe8ebee, metalness: 1, roughness: 1.0, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
     door: std({ color: 0xf2f0ec, metalness: 1, roughness: 1.35, map: TX.spunTextures().map, roughnessMap: TX.spunTextures().rough, normalMap: TX.spunTextures().normal, normalScale: N(0.18) }),
     steelHot: std({ color: 0xcfccc6, metalness: 1, roughness: 0.95, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.35) }),
     steel: std({ color: 0xc8cacc, metalness: 1, roughness: 0.75, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.3) }),

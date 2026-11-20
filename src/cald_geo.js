@@ -93,7 +93,7 @@ export function shellGeo(R, Lc, { top = 'ell', bot = 'ell', seg = 72, sheetW = 1
     pos.push(prof[i][0] * sa, prof[i][1], prof[i][0] * ca); nor.push(pn[i][0] * sa, pn[i][1], pn[i][0] * ca);
     uv.push((j / seg) * (2 * Math.PI * R) / sheetW, s[i] / sheetL);
   }
-  for (let i = 0; i < prof.length - 1; i++) for (let j = 0; j < seg; j++) { const a = i * (seg + 1) + j, b2 = a + seg + 1; idx.push(a, b2, a + 1, b2, b2 + 1, a + 1); }
+  for (let i = 0; i < prof.length - 1; i++) for (let j = 0; j < seg; j++) { const a = i * (seg + 1) + j, b2 = a + seg + 1; idx.push(a, a + 1, b2, b2, a + 1, b2 + 1); } // CCW visto de fora (normais para fora)
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
   return g;
 }
@@ -224,3 +224,11 @@ export function iBeamGeo(h, b, tw, tf, L) {
 export function boxGeo(w, h, d) { return cached(`box_${w}_${h}_${d}`, () => { const g = new THREE.BoxGeometry(w, h, d); const P = g.attributes.position, N = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) { const ax = Math.abs(N.getX(i)), ay = Math.abs(N.getY(i)); const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (ax > 0.5) uv.setXY(i, z, y); else if (ay > 0.5) uv.setXY(i, x, z); else uv.setXY(i, x, y); } return g; }); }
 export const unitBox = () => cached('ubox', () => new THREE.BoxGeometry(1, 1, 1));
 export const unitCyl = (seg = 16) => cached('ucyl' + seg, () => new THREE.CylinderGeometry(1, 1, 1, seg));
+
+/** cinta/abraçadeira com espessura (perfil retangular chanfrado), eixo y, raio interno R */
+export function strapGeo(R, w = 0.04, t = 0.003, seg = 96) {
+  return cached(`strap_${R}_${w}_${t}`, () => {
+    const h = w / 2, p = [[R - 0.001, -h], [R + t * 0.6, -h], [R + t, -h + t], [R + t, h - t], [R + t * 0.6, h], [R - 0.001, h]].map(([x, y]) => new THREE.Vector2(x, y));
+    return new THREE.LatheGeometry(p, seg);
+  });
+}

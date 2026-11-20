@@ -85,10 +85,10 @@ export function cladTextures() {
   // rebites ao longo da costura longitudinal
   for (let k = 0; k < 10; k++) { const cy = (k + 0.5) * M / 10, cx = 6; for (let yy = -4; yy <= 4; yy++) for (let xx = -4; xx <= 4; xx++) { const d2 = xx * xx + yy * yy; if (d2 < 16) { const ii = ((Math.round(cy) + yy + M) % M) * N + ((cx + xx + N) % N); h[ii] += 0.8 * Math.sqrt(1 - d2 / 16); } } }
   const alb = putGray(N, M, (i) => {
-    const m = md[i * 4] / 255; const v = 0.86 + (big[i] - 0.5) * 0.08 + (blot[i] - 0.5) * 0.05 - m * 0.04;
+    const m = md[i * 4] / 255; const v = 0.88 + (big[i] - 0.5) * 0.04 + (blot[i] - 0.5) * 0.03 - m * 0.025;
     return [v * 0.995, v, v * 1.01];
   });
-  const rough = putGray(N, M, (i) => { const m = md[i * 4] / 255; const v = 0.16 + (blot[i] - 0.5) * 0.12 + sst(0.55, 0.8, big[i]) * 0.1 + m * 0.18; return [1, v, 1]; });
+  const rough = putGray(N, M, (i) => { const m = md[i * 4] / 255; const v = 0.27 + (blot[i] - 0.5) * 0.08 + sst(0.55, 0.8, big[i]) * 0.05 + m * 0.12; return [1, v, 1]; });
   _clad = { map: tex(alb, { srgb: true }), rough: tex(rough), normal: normalFromHeight(h, N, M, 1.3) };
   return _clad;
 }
@@ -115,7 +115,7 @@ export function steelTextures() {
     const v = 0.86 + (s - 0.5) * 0.05 + (blot[i] - 0.5) * 0.06 - f * 0.05;
     const ht = sst(0.58, 0.82, heat[i]); // tom de calor: palha → bronze
     h[i] = s * 0.3 - f * 0.05;
-    return [v + ht * 0.03, v - ht * 0.02, v * 1.0 - ht * 0.09];
+    return [v + ht * 0.008, v - ht * 0.004, v - ht * 0.02];
   });
   const rough = putGray(N, M, (i) => { const y = (i / N) | 0, s = col[y], f = fd[i * 4] / 255; return [1, 0.2 + (s - 0.5) * 0.08 + (blot[i] - 0.5) * 0.1 + f * 0.2, 1]; });
   _steel = { map: tex(alb, { srgb: true }), rough: tex(rough), normal: normalFromHeight(h, N, M, 0.9) };

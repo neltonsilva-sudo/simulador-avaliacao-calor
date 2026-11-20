@@ -30,8 +30,11 @@ export function buildEquipment(ctx) {
     const za = zr + 0.3, zb = zf - 0.34, Lc = zb - za;
     batch.add('clad', G.shellGeo(R, Lc, { top: 'none', bot: 'none', seg: 96, sheetW: 1.2, sheetL: 1.0 }), G.mat4([cx, cy, (za + zb) / 2], [Math.PI / 2, 0, 0]));
     // cintas de fixação a cada ~1 m
-    const strapG = G.cached('strap' + R, () => new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.03, 96, 1, true));
-    for (let z = za + 0.5; z < zb - 0.2; z += 1.0) batch.add('steel', strapG, G.mat4([cx, cy, z], [Math.PI / 2, 0, 0]));
+    const strapG = G.strapGeo(R, 0.045, 0.003);
+    for (let z = za + 0.5; z < zb - 0.2; z += 1.0) { batch.add('alu', strapG, G.mat4([cx, cy, z], [Math.PI / 2, 0, 0])); box('alu', [cx + R + 0.008, cy - 0.25, z], [0.02, 0.06, 0.05]); }
+    // tampo traseiro abaulado soldado ao costado (fecha o cilindro)
+    { const hb = 0.28, Rb = (R * R + hb * hb) / (2 * hb), tb = Math.asin(R / Rb); const capB = new THREE.SphereGeometry(Rb, 96, 12, 0, Math.PI * 2, 0, tb);
+      batch.add('clad', capB, G.mat4([cx, cy, za - hb + Rb], [-Math.PI / 2, 0, 0])); batch.add('alu', G.strapGeo(R, 0.06, 0.004), G.mat4([cx, cy, za], [Math.PI / 2, 0, 0])); }
     // anel de arremate do isolamento e espelho (tube sheet) frontal
     batch.add('steelHot', new THREE.CylinderGeometry(R + 0.02, R + 0.02, 0.12, 96), G.mat4([cx, cy, zb + 0.06], [Math.PI / 2, 0, 0]));
     // flange da porta (anel) + porta abaulada (calota) com parafusos
@@ -144,7 +147,7 @@ export function buildEquipment(ctx) {
     for (const dx of [-0.66, 0.66]) for (let k = 0; k < 7; k++) inst.add('nut', G.hexGeo(), M.nut, G.alignY(V(cx + dx * 1.005, 0.7 + k * 0.36, zr + 0.0), X, [0.03, 0.02, 0.03]));
     const chz = zr - 0.3;
     batch.add('clad', G.shellGeo(0.32, 11.2 - 3.05, { top: 'none', bot: 'none', seg: 40, sheetW: 1.0, sheetL: 1.0 }), G.mat4([cx, 3.05 + (11.2 - 3.05) / 2, chz]));
-    const chS = G.cached('chStrap', () => new THREE.CylinderGeometry(0.327, 0.327, 0.03, 40, 1, true));
+    const chS = G.strapGeo(0.32, 0.035, 0.003, 48);
     for (let y = 3.6; y < 9.5; y += 1.0) batch.add('steel', chS, G.mat4([cx, y, chz]));
     cyl('paintAlu', V(cx, 3.03, chz), V(cx, 3.25, chz), 0.36, 32);
     box('steelDark', [cx + 0.38, 3.6, chz], [0.12, 0.03, 0.03]); // alavanca do registro (damper)
@@ -216,7 +219,7 @@ export function buildEquipment(ctx) {
   // tê da caldeira 2
   cyl('clad', V(42.5, 5.7, az), V(42.5, ay, az), aer.R, 28);
   // cintas da linha aérea
-  const aS = G.cached('aStrap', () => new THREE.CylinderGeometry(aer.R + 0.004, aer.R + 0.004, 0.022, 28, 1, true));
+  const aS = G.strapGeo(aer.R, 0.025, 0.0025, 32);
   for (let x = ax0 + 0.8; x < xD - 0.5; x += 1.0) batch.add('steel', aS, G.mat4([x, ay, az], [0, 0, Math.PI / 2]));
   for (const y of [5.9]) for (const x of [ax0, 42.5]) batch.add('steel', aS, G.mat4([x, y, az]));
   // suportes pendurados nas tesouras (tirante + braçadeira)
@@ -316,7 +319,7 @@ export function buildEquipment(ctx) {
     const de = BOILERS.find((b) => b.id === 'desaerador'); const [dx, , dz] = de.c, R = de.R;
     const yb = 0.6, Lc = de.L - yb - R; // tampos 2:1 (R/2 cada)
     batch.add('clad', G.shellGeo(R, Lc, { top: 'ell', bot: 'ell', seg: 72, sheetW: 1.2, sheetL: 1.0 }), G.mat4([dx, yb + R / 2 + Lc / 2, dz]));
-    const sS = G.cached('dStrap', () => new THREE.CylinderGeometry(R + 0.006, R + 0.006, 0.03, 72, 1, true));
+    const sS = G.strapGeo(R, 0.045, 0.003, 72);
     for (let y = yb + R / 2 + 0.5; y < yb + R / 2 + Lc; y += 1.0) batch.add('steel', sS, G.mat4([dx, y, dz]));
     for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, lx2 = dx + Math.cos(a) * (R - 0.15), lz2 = dz + Math.sin(a) * (R - 0.15); batch.add('paintBlue', G.iBeamGeo(0.16, 0.16, 0.008, 0.012, yb + 0.35), G.mat4([lx2, (yb + 0.35) / 2, lz2], [Math.PI / 2, a, 0])); box('paintBlue', [lx2, 0.01, lz2], [0.28, 0.02, 0.28]); }
     // respiro no topo (válvula + bocal aberto) → pluma
