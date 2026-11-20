@@ -132,8 +132,9 @@ export function buildMachines(stage, app) {
   const p1 = ctx.doorObjs.forno1?.[0]?.pivot; if (p1) { doorHandle.position.set(0.86, 1.14, 0.1); p1.add(doorHandle); }
 
   stage.scene.add(root);
-  let panelMin = -1;
+  let panelMin = -1, ctrlAcc = 1;
   const api = {
+    get ctrls() { return ctx.ctrls || []; },
     group: root, panelButton: ctx.panelButton, doorHandle, ovens: ovenGroups,
     setDoor(id, v) { if (state[id]) state[id].target = Math.max(0, Math.min(1, +v)); },
     doorOpen: (id) => state[id]?.cur ?? 0,
@@ -170,11 +171,17 @@ export function buildMachines(stage, app) {
       if (ctx.fan) { ctx.fan.blades.rotation.x += dt * 38; ctx.fan.head.rotation.y = Math.sin(t * 0.35) * 0.5; }
       // vapor
       steam.update(dt);
-      // display do forno 1: minutos restantes da fornada (25 → 0, em ciclo), segue o relógio simulado
-      const clock = app?.state?.clock; const pt = ctx.panelTex.forno1;
-      if (pt && clock != null) {
-        const m = Math.floor(clock / 60), rem = 25 - (((m - 340) % 26) + 26) % 26;
-        if (m !== panelMin) { panelMin = m; pt.redraw(f1.cur > 0.5 ? 180 - Math.round(f1.cur * 0) : 180, Math.max(0, rem)); }
+      // displays dos controladores: PV (temperatura real da câmara) e SV (setpoint) vindos de app.field; o turbo mostra
+      // PV em vermelho e os minutos restantes da fornada em verde (segue o relógio simulado). Redesenha só quando muda.
+      ctrlAcc += dt;
+      if (ctrlAcc > 0.25 && app?.field?.pv) {
+        ctrlAcc = 0; const F = app.field, clock = app.state?.clock ?? 0, m = Math.floor(clock / 60), rem = Math.max(0, 25 - (((m - 340) % 26) + 26) % 26);
+        for (const c of ctx.ctrls || []) {
+          const on = F.on[c.id] !== false, pv = Math.round(F.pv[c.id]) - (c.kind === 'deck' ? c.k * 2 : 0), sv = Math.round(F.sp[c.id]);
+          const key = c.kind === 'turbo' ? `${on}|${pv}|${rem}` : `${on}|${pv}|${sv}`;
+          if (key === c.last) continue; c.last = key;
+          if (c.kind === 'turbo') c.tex.redraw(on ? pv : '  -', on ? rem : '  '); else c.tex.redraw?.(pv, sv, on);
+        }
       }
     },
   };

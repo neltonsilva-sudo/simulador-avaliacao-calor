@@ -82,6 +82,10 @@ const app = {
   fieldAtSensor() { const p = app.sensorWorld(tmpP); return field.at(p, { solar: state.solar }); },
   readings: () => sensors.read(),
   setDoor(id, open) { field.setDoor(id, open ? 1 : 0); app.machines?.setDoor?.(id, open ? 1 : 0); app.emit('door', { id, open: !!open }); },
+  /** Painéis dos fornos: setpoint (SV) e liga/desliga; a temperatura real (PV) evolui em stepOvens. */
+  setOvenSetpoint(id, v) { field.setSetpoint(id, v); app.emit('oven', { id }); app.emit('change'); },
+  setOvenOn(id, b) { field.setOven(id, b); app.machines?.setOven?.(id, b); app.emit('oven', { id }); app.emit('change'); },
+  oven: (id) => ({ id, pv: field.pv[id], sp: field.sp[id], on: field.on[id] !== false, label: OVENS.find((o) => o.id === id)?.label }),
   holdDoor(b) { state.doorHold = !!b; applyDoor(); app.emit('change'); },
   setWater(v) { state.water = v; app.meter?.setWater?.(v); app.emit('change'); },
   setWick(w) { state.wick = w; app.meter?.setWick?.(w); app.emit('change'); },
@@ -161,6 +165,7 @@ function stepSimulation(dt) {
   const unsteady = state.station === 'forno' ? field.doors.forno1 * 0.6 : 0; // turbulência junto à porta aberta
   for (let i = 0; i < n; i++) {
     state.clock += 1;
+    field.stepOvens(1);
     if (state.running) {
       const seg = CY.CYCLES[state.env].segmentAt(state.clock);
       if (state.followCycle && (!lastSeg || seg.act !== lastSeg.act || seg.station !== lastSeg.station)) {
@@ -221,6 +226,7 @@ function getInput() {
 
   bootStep(94, 'Quase pronto…');
   app.ui = await safe('ui', () => uiM?.createUI(document.getElementById('ui'), app));
+  const ovM = await load('./ui_oven.js'); app.ovenPanel = await safe('ui_oven', () => ovM?.createOvenPanel?.(app));
   // atalhos de captura/teste: ?st=forno|bancada|descanso (tripé no ponto), ?door=1 (porta do forno 1 aberta),
   // ?t=HH:MM (relógio), ?run=1 (simulação correndo), ?on=1 (medidor ligado), ?present=1 (aparelho na vitrine), ?worker=forno|bancada|descanso
   if (state.env !== 'fornos') { const e = state.env; state.env = 'fornos'; await app.setEnv(e, { view: false }); }

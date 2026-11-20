@@ -34,6 +34,11 @@ function cylF(p, c) {
 export function createHeatField() {
   const doors = Object.fromEntries(OVENS.map((o) => [o.id, 0]));
   const on = Object.fromEntries(OVENS.map((o) => [o.id, true]));
+  // controladores dos fornos: SV = setpoint ajustado no painel; PV = temperatura real da câmara (1ª ordem: aquece ~8 °C/min,
+  // esfria ~3 °C/min, perde calor com a porta aberta). As superfícies (vidro/chapa) e o ar acompanham PV.
+  const sp = Object.fromEntries(OVENS.map((o) => [o.id, o.setpoint]));
+  const pv = Object.fromEntries(OVENS.map((o) => [o.id, o.setpoint]));
+  const heatK = (o) => Math.max(0, (pv[o.id] - AMB.wallT) / (o.setpoint - AMB.wallT)); // 1 = condição de projeto
   let fanOn = true;
 
   function inControl(p) { const C = CONTROL_ROOM; return p.x > C.x0 && p.x < C.x1 && p.z > C.z0 && p.z < C.z1; }
@@ -69,14 +74,14 @@ export function createHeatField() {
       if (d <= 0.02) continue;
       const x0 = o.x - o.w / 2, x1 = o.x + o.w / 2;
       const Ffront = rectSolidAngle(x0 - p.x, x1 - p.x, 0 - p.y, o.h - p.y, d) / (4 * Math.PI);
-      const Tf = (on[o.id] ? o.frontT : AMB.wallT) + K;
+      const hk = heatK(o), Tf = AMB.wallT + (o.frontT - AMB.wallT) * hk + K;
       let F = Ffront, s4 = Ffront * Tf ** 4;
       for (const dr of o.doors) {
         const dx0 = o.x + dr.cx - dr.w / 2, dx1 = o.x + dr.cx + dr.w / 2;
         const Fd = rectSolidAngle(dx0 - p.x, dx1 - p.x, dr.y0 - p.y, dr.y0 + dr.h - p.y, d) / (4 * Math.PI);
         const open = doors[o.id];
-        const Tin = (on[o.id] ? o.setpoint + 8 : AMB.wallT + 20) + K; // cavidade vista pela abertura (paredes e resistências um pouco acima do ar de cocção)
-        const Tg = (on[o.id] ? o.glassT : AMB.wallT) + K;
+        const Tin = pv[o.id] + (on[o.id] ? 8 : 0) + K; // cavidade vista pela abertura (paredes e resistências um pouco acima do ar de cocção)
+        const Tg = AMB.wallT + (o.glassT - AMB.wallT) * hk + K;
         const Td4 = open * Tin ** 4 + (1 - open) * Tg ** 4;
         s4 += Fd * (Td4 - Tf ** 4); // a porta substitui a parte correspondente da chapa
         parts.push({ id: o.id, F: Fd, open });
@@ -96,7 +101,7 @@ export function createHeatField() {
       const dx = Math.max(0, Math.abs(p.x - o.x) - o.w / 2), dz = Math.max(0, p.z - zf);
       const r = Math.hypot(dx, dz);
       const open = doors[o.id];
-      const base = on[o.id] ? 3.2 : 0.4;
+      const base = 0.4 + 2.8 * heatK(o);
       ta += base * Math.exp(-r / 2.4) + 6.5 * open * Math.exp(-r / 1.1) * (p.y > 0.6 ? 1 : 0.6);
       e += 0.45 * open * Math.exp(-r / 1.3); // vapor/umidade que sai do forno (vaporização da massa)
       va += 0.22 * open * Math.exp(-r / 1.2); // corrente de convecção junto à porta aberta
@@ -149,6 +154,15 @@ export function createHeatField() {
     doors, on, at, radiant, air, globeEq, wetBulb, naturalWet,
     setDoor(id, open) { if (id in doors) doors[id] = Math.max(0, Math.min(1, +open)); },
     setOven(id, b) { if (id in on) on[id] = !!b; },
+    sp, pv,
+    setSetpoint(id, v) { if (id in sp) sp[id] = Math.max(0, Math.min(300, Math.round(v))); },
+    /** avança a temperatura real das câmaras dt segundos simulados */
+    stepOvens(dt) {
+      for (const o of OVENS) { const id = o.id, tgt = on[id] ? sp[id] : AMB.wallT;
+        const r = tgt > pv[id] ? 8 / 60 : 3 / 60; const d = tgt - pv[id];
+        pv[id] += Math.sign(d) * Math.min(Math.abs(d), r * dt * (Math.abs(d) < 6 ? Math.max(0.25, Math.abs(d) / 6) : 1));
+        pv[id] -= doors[id] * (on[id] ? 0.6 : 1.2) / 60 * dt * Math.max(0, (pv[id] - AMB.wallT) / 150); }
+    },
     setFan(b) { fanOn = !!b; }, get fanOn() { return fanOn; },
   };
 }

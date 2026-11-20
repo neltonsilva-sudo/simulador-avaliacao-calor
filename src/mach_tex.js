@@ -311,29 +311,33 @@ export function turboPanel({ temp = 180, time = 25, hTop = 0.95 } = {}) {
 /** controlador digital de câmara (FOTO 4): moldura preta, display vermelho (temperatura) em cima e verde embaixo, 4 teclas */
 export function deckController(vals = [[230, 250], [228, 245]]) {
   const W = 256, H = 384, cm = canvas(W, H), ce = canvas(W, H), x = cm.getContext('2d'), e = ce.getContext('2d');
-  x.fillStyle = '#0c0d0e'; x.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
-  x.fillStyle = '#151718'; roundRect(x, 10, 10, W - 20, H - 20, 14); x.fill();
-  text(x, 'TEMP °C', W / 2, 36, 16, 'rgba(220,220,220,0.55)');
-  for (const c of [x, e]) { c.fillStyle = '#020202'; if (c === x) { roundRect(c, 28, 52, W - 56, 210, 8); c.fill(); } }
-  const [top, bot] = vals[0];
-  for (const c of [x, e]) {
-    draw7(c, String(top).padStart(3, ' '), 54, 66, 72, '#ff2a20', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
-    draw7(c, String(bot).padStart(3, ' '), 54, 168, 72, '#33ff4a', c === x ? 'rgba(60,255,80,0.06)' : 'rgba(0,0,0,0)', c === e);
-  }
-  ['up', 'down', 'prog', 'power'].forEach((ic, i) => key(x, 50 + i * 52, 300, 40, ic));
-  text(x, 'SUP     INF', W / 2, 350, 14, 'rgba(220,220,220,0.4)');
-  return { map: tex(cm, true, false), emissive: tex(ce, true, false) };
+  const draw = (top, bot, on = true) => {
+    x.fillStyle = '#0c0d0e'; x.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
+    x.fillStyle = '#151718'; roundRect(x, 10, 10, W - 20, H - 20, 14); x.fill();
+    text(x, 'TEMP °C', W / 2, 36, 16, 'rgba(220,220,220,0.55)');
+    x.fillStyle = '#020202'; roundRect(x, 28, 52, W - 56, 210, 8); x.fill();
+    for (const c of [x, e]) {
+      draw7(c, on ? String(top).padStart(3, ' ') : '   ', 54, 66, 72, '#ff2a20', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
+      draw7(c, on ? String(bot).padStart(3, ' ') : '  -', 54, 168, 72, '#33ff4a', c === x ? 'rgba(60,255,80,0.06)' : 'rgba(0,0,0,0)', c === e);
+    }
+    ['up', 'down', 'prog', 'power'].forEach((ic, i) => key(x, 50 + i * 52, 300, 40, ic));
+    text(x, 'PV         SV', W / 2, 350, 14, 'rgba(220,220,220,0.4)');
+  };
+  draw(vals[0][0], vals[0][1]);
+  const map = tex(cm, true, false), emissive = tex(ce, true, false);
+  return { map, emissive, redraw(pv, sv, on = true) { draw(pv, sv, on); map.needsUpdate = emissive.needsUpdate = true; } };
 }
 /** IHM azul-clara do rotativo (FOTO 3) */
 export function rotativoPanel() {
   const W = 256, H = 512, cm = canvas(W, H), ce = canvas(W, H), x = cm.getContext('2d'), e = ce.getContext('2d');
+  const draw = (pv = 200, sv = 200, on = true) => {
   x.fillStyle = '#1a1c1e'; x.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
   for (const c of [x, e]) {
     const g = c.createLinearGradient(0, 30, 0, 230); g.addColorStop(0, '#9fd6ff'); g.addColorStop(1, '#5aa8e8');
     c.fillStyle = g; roundRect(c, 24, 30, W - 48, 200, 8); c.fill();
     c.fillStyle = '#0d2a48'; c.font = '700 22px "Roboto Condensed", Arial'; c.textAlign = 'left'; c.fillText('PROG 04  PÃO FRANCÊS', 38, 62);
-    c.fillStyle = 'rgba(13,42,72,0.9)'; c.font = '700 64px "Roboto Mono", monospace'; c.fillText('200°', 40, 140);
-    c.font = '600 26px "Roboto Mono", monospace'; c.fillText('18:00  VAPOR 6s', 40, 196);
+    c.fillStyle = 'rgba(13,42,72,0.9)'; c.font = '700 64px "Roboto Mono", monospace'; c.fillText(on ? `${pv}°` : 'DESL', 40, 140);
+    c.font = '600 26px "Roboto Mono", monospace'; c.fillText(`SET ${sv}°  VAPOR 6s`, 40, 196);
     c.fillStyle = 'rgba(13,42,72,0.6)'; c.fillRect(38, 152, (W - 76) * 0.62, 10);
   }
   // teclado
@@ -341,22 +345,29 @@ export function rotativoPanel() {
   lbl.forEach((l, i) => { const cx = 62 + (i % 3) * 66, cy = 278 + Math.floor(i / 3) * 52; x.fillStyle = '#d8dadc'; roundRect(x, cx - 26, cy - 19, 52, 38, 6); x.fill(); text(x, l, cx, cy + 1, 22, '#222', 'center', 700); });
   x.fillStyle = '#2bbd4a'; roundRect(x, 30, 470 - 18, 90, 34, 6); x.fill(); x.fillStyle = '#d42a20'; roundRect(x, W - 120, 470 - 18, 90, 34, 6); x.fill();
   text(x, 'LIGA', 75, 470, 18, '#fff', 'center', 700); text(x, 'DESL', W - 75, 470, 18, '#fff', 'center', 700);
-  return { map: tex(cm, true, false), emissive: tex(ce, true, false) };
+  };
+  draw();
+  const map = tex(cm, true, false), emissive = tex(ce, true, false);
+  return { map, emissive, redraw(pv, sv, on = true) { draw(pv, sv, on); map.needsUpdate = emissive.needsUpdate = true; } };
 }
 /** torre de comando da FOTO 5: painel preto, display vermelho, teclas, botão de emergência, pictogramas */
 export function towerPanel() {
   const W = 256, H = 768, cm = canvas(W, H), ce = canvas(W, H), x = cm.getContext('2d'), e = ce.getContext('2d');
+  const draw = (pv = 190, sv = 190, on = true) => {
   x.fillStyle = '#080909'; x.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
   for (const c of [x, e]) {
-    draw7(c, '190', 46, 40, 64, '#ff3322', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
-    draw7(c, '35', 70, 128, 40, '#ff6a20', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
+    draw7(c, on ? String(pv).padStart(3, ' ') : '  -', 46, 40, 64, '#ff3322', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
+    draw7(c, on ? String(sv).padStart(3, ' ') : '   ', 58, 128, 40, '#ff6a20', c === x ? 'rgba(255,60,40,0.06)' : 'rgba(0,0,0,0)', c === e);
   }
-  text(x, 'TEMPO  min', W / 2, 192, 15, 'rgba(220,220,220,0.5)');
+  text(x, 'SET  °C', W / 2, 192, 15, 'rgba(220,220,220,0.5)');
   const ics = ['temp', 'clock', 'fan', 'steam', 'light', 'prog'];
   ics.forEach((ic, i) => { const cx = 60 + (i % 3) * 68, cy = 248 + Math.floor(i / 3) * 62; icon(x, ic, cx, cy, 34); x.fillStyle = 'rgba(210,210,210,0.6)'; x.beginPath(); x.arc(cx, cy + 24, 3, 0, 7); x.fill(); });
   // anel do botão de emergência (o botão é geometria)
   x.fillStyle = '#e8c21a'; x.beginPath(); x.arc(W / 2, 470, 58, 0, 7); x.fill(); text(x, 'EMERGÊNCIA', W / 2, 545, 15, 'rgba(230,230,230,0.6)');
-  return { map: tex(cm, true, false), emissive: tex(ce, true, false) };
+  };
+  draw();
+  const map = tex(cm, true, false), emissive = tex(ce, true, false);
+  return { map, emissive, redraw(pv, sv, on = true) { draw(pv, sv, on); map.needsUpdate = emissive.needsUpdate = true; } };
 }
 /** plaquinha de pictogramas (adesivo) da torre: triângulo amarelo + círculo azul */
 export function pictoTexture() {

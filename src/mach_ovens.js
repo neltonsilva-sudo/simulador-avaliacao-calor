@@ -68,6 +68,7 @@ export function buildTurbo(o, ctx) {
   const pnl = T.turboPanel({ temp: 180, time: 25 }); ctx.panelTex.forno1 = pnl;
   const pMat = displayMaterial(pnl, 2.2); ctx.mats.push(pMat);
   const pm = new THREE.Mesh(new THREE.PlaneGeometry(px1 - px0, py1 - py0), pMat); pm.position.set((px0 + px1) / 2, (py0 + py1) / 2, zF + 0.012); g.add(pm);
+  (ctx.ctrls ||= []).push({ id: o.id, kind: 'turbo', k: 0, tex: pnl, mesh: pm });
   ctx.panelButton = new THREE.Object3D(); ctx.panelButton.position.set((px0 + px1) / 2, py1 - (py1 - py0) * 0.62, zF + 0.02); g.add(ctx.panelButton);
   // faixa/ressalto abaixo da porta e gabinete inferior (FOTO 2: friso horizontal, rebaixo escuro, painel, rodapé)
   B.box('steelPol', -W, 0.455, zF - 0.01, W, 0.5, zF + 0.035, 0.006);
@@ -199,6 +200,7 @@ export function buildVitrine(o, ctx) {
   const tp = T.towerPanel(), tm = displayMaterial(tp, 2.0); ctx.mats.push(tm);
   const pw = tx1 - tx0 - 0.03, ph = pw * 3;
   const tpm = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), tm); tpm.position.set((tx0 + tx1) / 2, ty1 - 0.04 - ph / 2, tz1 + 0.0015); g.add(tpm);
+  (ctx.ctrls ||= []).push({ id: o.id, kind: 'tower', k: 0, tex: tp, mesh: tpm });
   // botão de emergência (cogumelo vermelho)
   const ey = ty1 - 0.04 - ph * (470 / 768);
   B.cyl('redPaint', 0.024, 0.02, [(tx0 + tx1) / 2, ey, tz1 + 0.012], 'z', 24);
@@ -261,6 +263,7 @@ export function buildLastro4(o, ctx) {
     B.box('black', rx - cw / 2 - 0.01, cy - ch / 2 - 0.01, zF + 0.02, rx + cw / 2 + 0.01, cy + ch / 2 + 0.01, zF + 0.035, 0.006);
     const ct = T.deckController([[230 - k * 2, 248 - k * 3]]); const cm = displayMaterial(ct, 2.2); ctx.mats.push(cm);
     const cmesh = new THREE.Mesh(new THREE.PlaneGeometry(cw, ch), cm); cmesh.position.set(rx, cy, zF + 0.0365); g.add(cmesh);
+    (ctx.ctrls ||= []).push({ id: o.id, kind: 'deck', k, tex: ct, mesh: cmesh });
     // porta basculante (dobradiça embaixo)
     const piv = doorPivot(g, 0, zF + 0.03); piv.position.y = y0 - 0.02; const D = new Batch();
     const ph = y1 - y0 + 0.045;
@@ -342,6 +345,7 @@ export function buildLastro(o, ctx) {
     B.box('black', pc0 + 0.02, cy - ch / 2 - 0.01, zF + 0.02, pc1 - 0.02, cy + ch / 2 + 0.01, zF + 0.032, 0.004);
     const ct = T.deckController([[240 - k * 3, 260 - k * 4]]); const cm = displayMaterial(ct, 2.0); ctx.mats.push(cm);
     const mm = new THREE.Mesh(new THREE.PlaneGeometry(cw, ch), cm); mm.position.set((pc0 + pc1) / 2, cy, zF + 0.0335); g.add(mm);
+    (ctx.ctrls ||= []).push({ id: o.id, kind: 'deck', k, tex: ct, mesh: mm });
   });
   // faixa superior (sem logotipo) e coifa
   B.box('steel', -W, 1.98, zF - 0.02, W, H, zF + 0.03, 0.006);
@@ -375,6 +379,7 @@ export function buildRotativo(o, ctx) {
   const cw = px1 - px0 - 0.1, ch = cw * 2, cy = 1.42;
   B.box('black', px0 + 0.04, cy - ch / 2 - 0.02, zF + 0.02, px1 - 0.04, cy + ch / 2 + 0.02, zF + 0.04, 0.008);
   const rmesh = new THREE.Mesh(new THREE.PlaneGeometry(cw, ch), rm); rmesh.position.set((px0 + px1) / 2, cy, zF + 0.0405); g.add(rmesh);
+  (ctx.ctrls ||= []).push({ id: o.id, kind: 'rot', k: 0, tex: rp, mesh: rmesh });
   B.cyl('redPaint', 0.022, 0.02, [(px0 + px1) / 2, cy - ch / 2 - 0.1, zF + 0.03], 'z', 20);
   B.box('yellow', (px0 + px1) / 2 - 0.045, cy - ch / 2 - 0.145, zF + 0.02, (px0 + px1) / 2 + 0.045, cy - ch / 2 - 0.055, zF + 0.024, 0.002, 1);
   // cavidade com carrinho girando
