@@ -141,10 +141,12 @@ export function buildProps(stage, app) {
   const seg = (a, b, r = 0.55) => segs.push([a[0], a[2], b[0], b[2], r]);
   seg(S.forno.worker, S.bancada.worker); seg(S.bancada.worker, S.descanso.worker); seg(S.forno.tripod, S.bancada.tripod);
   for (const s of [S.forno, S.bancada, S.descanso]) seg(TABLE.pos, s.tripod, 0.45);
-  seg(S.bancada.worker, [2.6, 0, 5.6], 0.6); seg(S.descanso.worker, [-7.6, 0, 2.1], 0.6); // rotas de fuga (porta principal, saída de emergência)
+  seg(S.bancada.worker, [1.0, 0, Z1 - 0.6], 0.7); seg(S.descanso.worker, [X0 + 0.7, 0, 1.1], 0.7); // rotas de fuga (porta principal x 0,2–1,8; saída de emergência z 0,6–1,6)
   const ovenFront = OVENS.map((o) => [o.x - o.w / 2 - 0.05, ovenFrontZ(o), o.x + o.w / 2 + 0.05, ovenFrontZ(o) + 1.2]);
   // áreas de acesso obrigatório (NR-10, NR-23, saídas): quadro elétrico, extintores, portas, bebedouro
-  const hard = [[X0, -5.6, X0 + 1.15, -4.4], [X0, 1.0, X0 + 1.4, 3.8], [1.2, 4.6, 4.0, Z1], [X0, -1.85, X0 + 0.9, -0.55], [X1 - 0.9, -1.25, X1, 0.05]];
+  // portas (hall.js): saída de emergência na parede esquerda z∈[0,6;1,6]; porta principal na parede da frente x∈[0,2;1,8] —
+  // faixa livre de 1,5 m diante de cada uma (NR-23), com folga lateral
+  const hard = [[X0, -5.6, X0 + 1.15, -4.4], [X0, 0.1, X0 + 1.6, 2.1], [-0.3, Z1 - 1.6, 2.3, Z1], [X0, 1.0, X0 + 1.4, 3.8], [X0, -1.85, X0 + 0.9, -0.55], [X1 - 0.9, -1.25, X1, 0.05]];
   const placed = [], rejected = [];
 
   function rectDist(b, x, z) { const dx = Math.max(b.min.x - x, 0, x - b.max.x), dz = Math.max(b.min.z - z, 0, z - b.max.z); return Math.hypot(dx, dz); }
