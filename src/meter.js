@@ -57,7 +57,7 @@ float bodyH(vec3 p, vec3 n, out float cav, out vec2 tilt) {
   float o = wF * smoothstep(0.0, 1.6, d);
   float top = smoothstep(-1.0, 2.0, p.y - mix(76.0, 64.5, smoothstep(-70.0, -30.0, p.x)));
   tilt = vec2(0.22 * o * (1.0 - top) * step(60.0, p.x), 0.5 * o * top);
-  // "Inlite" em relevo, vertical, na ponta esquerda (lido de baixo para cima)
+  // (relevo da marca na ponta esquerda removido a pedido do usuário — máscara uEmb vazia)
   vec2 uv = vec2((p.y - 13.5) / 38.0, (p.x + 85.0) / 9.0);
   if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) { float e = texture2D(uEmb, vec2(uv.x, 1.0 - uv.y)).r; h += wF * 0.45 * e; }
   // friso de partição das duas metades da carcaça (laterais, topo e base)
@@ -205,7 +205,6 @@ export function buildMeter(stage, fw, app) {
   // nome do modelo "iTemp" serigrafado (sem logotipo de fabricante)
   const txt = add(new THREE.PlaneGeometry(PANEL.w, PANEL.h), new THREE.MeshStandardMaterial({ map: panelTextTex(PANEL.w, PANEL.h, [
     { x: SCREEN.x - PANEL.x, y: 54.5 - 1.6 - PANEL.y, size: 4.6, weight: 500, gap: 0.25, parts: [['i', '#8fd0ff', 800], ['temp', '#f4f6f8']] },
-    { x: SCREEN.x - PANEL.x, y: 10.7 - 1.7 - PANEL.y, size: 4.3, weight: 600, gap: 0, parts: [['Inlite', '#f4f6f8']] },
   ]), transparent: true, roughness: 0.25, polygonOffset: true, polygonOffsetFactor: -2 }), D, false);
   txt.position.set(PANEL.x, PANEL.y, PANEL_Z + 0.03);
   // teclas: quadrados arredondados azuis com ícone branco, levemente abaulados; afundam ao clicar

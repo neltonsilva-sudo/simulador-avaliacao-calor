@@ -153,7 +153,7 @@ export function keyTex(kind) {
     if (kind === 'menu') { for (const dy of [-27, 0, 27]) { g.beginPath(); g.roundRect(cx - 44 * s, cy + dy * s - 8 * s, 88 * s, 16 * s, 8 * s); g.fill(); } }
   }));
 }
-/** textos serigrafados no painel preto (decalque do tamanho do painel): "itemp" acima do visor (i azul-claro) e "Inlite" abaixo */
+/** textos serigrafados no painel preto (decalque do tamanho do painel): só o modelo "itemp" acima do visor (sem marca) */
 export function panelTextTex(pw, ph, items) {
   return once('panel_txt2', () => canvasTex(1024, Math.round(1024 * ph / pw), (g, W, H) => {
     g.clearRect(0, 0, W, H); const k = W / pw; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
@@ -165,11 +165,8 @@ export function panelTextTex(pw, ph, items) {
     }
   }));
 }
-/** máscara do relevo "Inlite" na lateral esquerda do corpo (lida de baixo para cima) */
-export const embossTex = () => once('emboss', () => canvasTex(512, 128, (g, W, H) => {
-  g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.filter = 'blur(2.2px)'; g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `600 112px ${FONT}`; g.fillText('Inlite', W / 2, H / 2 + 6);
-}, { srgb: false }));
+/** máscara de relevo da lateral esquerda — vazia: a marca do fabricante foi retirada a pedido do usuário */
+export const embossTex = () => once('emboss', () => canvasTex(16, 16, (g, W, H) => { g.fillStyle = '#000'; g.fillRect(0, 0, W, H); }, { srgb: false }));
 /** etiqueta prateada da traseira (dados do aparelho, sem marca) */
 export const backLabelTex = () => once('lbl_back', () => canvasTex(768, 384, (g, W, H) => {
   const grd = g.createLinearGradient(0, 0, W, H); grd.addColorStop(0, '#d9dcdf'); grd.addColorStop(0.5, '#c4c8cc'); grd.addColorStop(1, '#d4d7da');
