@@ -50,7 +50,13 @@ const app = {
   THREE, N, CY, STATIONS, OVENS, TABLE, PRESENT, HALL, BENCH, state, field, sensors, ENVS, BOILERS, PIPES, LEAKS, CONTROL_ROOM, HALL2,
   /** ambiente ativo (registro com views, stations, TABLE, PRESENT, HALL) e ciclo de trabalho dele (mesma forma do cycle.js) */
   env: () => ENVS[state.env],
-  cycle: () => CY.CYCLES[state.env],
+  cycle: () => (state.postos?.[state.env] ? CY.filterCycle(CY.CYCLES[state.env], state.postos[state.env]) : CY.CYCLES[state.env]),
+  /** Quantos/quais postos de trabalho (situações S1/S2/S3) a trabalhadora percorre neste ambiente. ids = ['S1','S2'] etc. */
+  setPostos(ids) { const all = Object.keys(CY.CYCLES[state.env].SITUACOES); const k = all.filter((i) => ids.includes(i));
+    (state.postos ||= {})[state.env] = k.length && k.length < all.length ? k : null; lastSeg = null;
+    const seg = app.cycle().segmentAt(state.clock); if (seg.station) app.worker?.setStation?.(seg.station, { act: seg.act });
+    applyDoor(); app.emit('postos', k); app.emit('change'); },
+  postos: () => Object.keys(app.cycle().SITUACOES),
   /** Troca de ambiente: módulos ouvem app.on('env') e mostram só o grupo ativo. */
   async setEnv(id, { view = true } = {}) {
     if (!ENVS[id] || id === state.env && app._envReady) return;
@@ -108,7 +114,7 @@ const app = {
   /** Inicia/para a simulação acelerada (jornada da forneira + sensores + firmware). */
   run(b = true) { state.running = !!b; app.emit(b ? 'started' : 'paused'); app.emit('change'); },
   setClock(sec) { state.clock = sec; app.fw?.setClock?.(sec); app.emit('change'); },
-  segment: () => CY.CYCLES[state.env].segmentAt(state.clock),
+  segment: () => app.cycle().segmentAt(state.clock),
   results: () => app.fw?.results?.() ?? null,
   timeOfDay: () => state.clock,
   fmtClock: CY.fmtClock,
@@ -119,7 +125,7 @@ const tmpP = new THREE.Vector3();
 
 function applyDoor() {
   if (state.env !== 'fornos') return;
-  const seg = CY.segmentAt(state.clock);
+  const seg = app.cycle().segmentAt(state.clock);
   const open = state.doorHold || (state.followCycle && state.running && seg.door);
   if ((field.doors.forno1 > 0.5) !== open) app.setDoor('forno1', open);
 }
@@ -167,7 +173,7 @@ function stepSimulation(dt) {
     state.clock += 1;
     field.stepOvens(1);
     if (state.running) {
-      const seg = CY.CYCLES[state.env].segmentAt(state.clock);
+      const seg = app.cycle().segmentAt(state.clock);
       if (state.followCycle && (!lastSeg || seg.act !== lastSeg.act || seg.station !== lastSeg.station)) {
         app.worker?.setStation?.(seg.station, { act: seg.act }); lastSeg = seg; app.emit('segment', seg);
       }
@@ -226,6 +232,7 @@ function getInput() {
 
   bootStep(94, 'Quase pronto…');
   app.ui = await safe('ui', () => uiM?.createUI(document.getElementById('ui'), app));
+  const poM = await load('./ui_postos.js'); app.postosUI = await safe('ui_postos', () => poM?.createPostosUI?.(app));
   const ovM = await load('./ui_oven.js'); app.ovenPanel = await safe('ui_oven', () => ovM?.createOvenPanel?.(app));
   // atalhos de captura/teste: ?st=forno|bancada|descanso (tripé no ponto), ?door=1 (porta do forno 1 aberta),
   // ?t=HH:MM (relógio), ?run=1 (simulação correndo), ?on=1 (medidor ligado), ?present=1 (aparelho na vitrine), ?worker=forno|bancada|descanso

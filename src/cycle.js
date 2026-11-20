@@ -119,3 +119,39 @@ export const CYCLES = {
   caldeiras: { env: 'caldeiras', SITUACOES: SITUACOES_C, ATIVIDADES: ATIVIDADES_C, JORNADA: JORNADA_C, CRONO: CRONO_C, SHIFT: SHIFT_C,
     hourComposition: hourCompositionC, hourAt: hourAtC, segmentAt: segmentAtC, PEAK: h(7), WORKER: 'operadora de caldeira' },
 };
+
+/**
+ * Ciclo com só alguns postos (situações térmicas) escolhidos pelo usuário. O tempo dos postos retirados passa para o posto
+ * "receptor" (o de maior tempo na hora de pico entre os escolhidos), na sua atividade principal. A cronometragem do receptor
+ * deixa de existir (ele vira "60 min − os demais"); somem as situações/atividades/cronometragens dos postos retirados.
+ * Mesma interface do ciclo original (SITUACOES, ATIVIDADES, JORNADA, CRONO, SHIFT, hourComposition, hourAt, segmentAt, PEAK).
+ */
+export function filterCycle(C, postos) {
+  const all = Object.keys(C.SITUACOES);
+  const keep = all.filter((id) => postos.includes(id));
+  if (!keep.length || keep.length === all.length) return C;
+  const peak = C.JORNADA.find((h) => h.start === C.PEAK) || C.JORNADA.find((h) => !h.off);
+  const base = C.hourComposition(peak);
+  // receptor: a situação "restante" do ciclo original (sem cronometragem própria), se ficou; senão a de maior tempo no pico
+  const rem = all.find((id) => !C.CRONO[id]);
+  const R = keep.includes(rem) ? rem : keep.slice().sort((a, b) => base.sit[b] - base.sit[a])[0];
+  const actsR = Object.values(C.ATIVIDADES).filter((a) => a.sit === R).map((a) => a.id);
+  const mainR = actsR.slice().sort((a, b) => (base.act[b] ?? 0) - (base.act[a] ?? 0))[0];
+  const SIT = Object.fromEntries(keep.map((id) => [id, C.SITUACOES[id]]));
+  const ACT = Object.fromEntries(Object.entries(C.ATIVIDADES).filter(([, a]) => keep.includes(a.sit)));
+  const CRONO = Object.fromEntries(Object.entries(C.CRONO).filter(([id]) => id !== R && (SIT[id] || ACT[id])));
+  function hourComposition(hr) {
+    const c = C.hourComposition(hr); if (!c) return c;
+    const sit = {}, act = {}; let movS = 0, movA = 0;
+    for (const id of all) if (keep.includes(id)) sit[id] = c.sit[id]; else movS += c.sit[id];
+    for (const [a, m] of Object.entries(c.act)) if (ACT[a]) act[a] = m; else movA += m;
+    sit[R] += movS; act[mainR] = (act[mainR] || 0) + movA;
+    return { sit, act };
+  }
+  function segmentAt(clock) {
+    const g = C.segmentAt(clock);
+    if (!g.sit || keep.includes(g.sit)) return g;
+    return { ...g, sit: R, act: mainR, station: C.SITUACOES[R].station, door: R === 'S1' && C.env === 'fornos' };
+  }
+  return { ...C, SITUACOES: SIT, ATIVIDADES: ACT, CRONO, hourComposition, segmentAt, postos: keep, receptor: R };
+}
