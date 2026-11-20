@@ -66,20 +66,20 @@ export function steelTextures() {
   // digitais e manchas de mão (canvas): elipses com cristas concêntricas
   const fc = canvas(N, M), fx = fc.getContext('2d'); fx.fillStyle = '#000'; fx.fillRect(0, 0, N, M);
   const rf = rng(91);
-  for (let k = 0; k < 26; k++) {
+  for (let k = 0; k < 70; k++) {
     const cx = rf() * N, cy = rf() * M, rx = 9 + rf() * 9, ry = rx * (1.2 + rf() * 0.4), a = rf() * Math.PI;
     for (let ring = 0; ring < 11; ring++) {
       fx.strokeStyle = `rgba(255,255,255,${0.05 + rf() * 0.07})`; fx.lineWidth = 1;
       fx.beginPath(); fx.ellipse(cx, cy, rx * (ring + 1) / 11, ry * (ring + 1) / 11, a, 0, Math.PI * 2); fx.stroke();
     }
   }
-  for (let k = 0; k < 9; k++) { // borrões de pano/mão
+  for (let k = 0; k < 22; k++) { // borrões de pano/mão
     const g = fx.createRadialGradient(0, 0, 0, 0, 0, 1); g.addColorStop(0, 'rgba(255,255,255,0.10)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     fx.save(); fx.translate(rf() * N, rf() * M); fx.rotate(rf() * 3); fx.scale(40 + rf() * 120, 20 + rf() * 50); fx.fillStyle = g; fx.beginPath(); fx.arc(0, 0, 1, 0, 7); fx.fill(); fx.restore();
   }
   // riscos finos em várias direções
   fx.lineCap = 'round';
-  for (let k = 0; k < 220; k++) {
+  for (let k = 0; k < 520; k++) {
     const x = rf() * N, y = rf() * M, L = 8 + rf() * 90, a = (rf() < 0.6 ? Math.PI / 2 + (rf() - 0.5) * 0.5 : rf() * Math.PI);
     fx.strokeStyle = `rgba(255,255,255,${0.12 + rf() * 0.3})`; fx.lineWidth = 0.5 + rf() * 0.7;
     fx.beginPath(); fx.moveTo(x, y); fx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); fx.stroke();
@@ -90,7 +90,7 @@ export function steelTextures() {
   const h = new Float32Array(N * M);
   for (let y = 0; y < M; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, s = col[x] * (0.75 + 0.5 * along[i]) - 0.35 * along[i], f = fd[i * 4] / 255;
-    const rough = clamp01(0.22 + (s - 0.5) * 0.07 + (blot[i] - 0.5) * 0.06 + f * 0.22);
+    const rough = clamp01(0.2 + (s - 0.5) * 0.07 + (blot[i] - 0.5) * 0.1 + f * 0.4);
     R.data[i * 4] = 255; R.data[i * 4 + 1] = rough * 255; R.data[i * 4 + 2] = 255; R.data[i * 4 + 3] = 255;
     const v = 0.88 + (s - 0.5) * 0.045 + (blot[i] - 0.5) * 0.05 - f * 0.03;
     const ht = sst(0.62, 0.8, heat[i]) * 0.06;

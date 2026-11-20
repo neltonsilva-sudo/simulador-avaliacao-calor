@@ -393,7 +393,8 @@ export async function buildWorker(stage, app) {
   }
   const _q = new THREE.Quaternion(), FAX = V3(0, 0, 1);
   function finger(side, f, angs) { ['', '1', '2'].forEach((k, i) => { const b = B[side + '_Finger' + f + k]; if (b && angs[i]) b.quaternion.multiply(_q.setFromAxisAngle(FAX, angs[i])); }); }
-  function handPose(side, grip) { // grip: 0 relaxada … 1 fechada (segurando esteira/copo/volante)
+  function handPose(side, grip, pen = false) {
+    if (pen) { finger(side, '1', [0.55, 0.6, 0.35]); finger(side, '2', [0.85, 0.95, 0.5]); finger(side, '3', [1.25, 1.2, 0.7]); finger(side, '4', [1.35, 1.2, 0.7]); finger(side, '0', [0.5, 0.55, 0.35]); B[side + '_Hand']?.updateMatrixWorld(true); return; } // grip: 0 relaxada … 1 fechada (segurando esteira/copo/volante)
     const P = (a, r) => a.map((x, i) => x * grip + r[i] * (1 - grip));
     finger(side, '1', P([0.9, 1.0, 0.6], [0.3, 0.4, 0.25])); finger(side, '2', P([1.0, 1.1, 0.65], [0.38, 0.48, 0.3]));
     finger(side, '3', P([1.05, 1.1, 0.65], [0.45, 0.55, 0.32])); finger(side, '4', P([1.1, 1.05, 0.6], [0.5, 0.55, 0.32]));
@@ -407,6 +408,15 @@ export async function buildWorker(stage, app) {
   group.updateMatrixWorld(true);
   const hipRest = wpos(B.Pelvis).y, Lt = wpos(B.L_Calf).distanceTo(wpos(B.L_Thigh)), Lc = wpos(B.L_Foot).distanceTo(wpos(B.L_Calf)), ankH = wpos(B.L_Foot).y;
   const hipX = wpos(B.Pelvis).x, hipZ = wpos(B.Pelvis).z;
+  const footRest = {}; for (const sd of ['L', 'R']) { const p = wpos(B[sd + '_Foot']); footRest[sd] = { x: p.x, z: p.z, q: B[sd + '_Foot'].getWorldQuaternion(new THREE.Quaternion()) }; }
+  function ikB(ua, fa, ha, target, pole) {
+    const s = wpos(ua), a = wpos(fa).distanceTo(s), b = wpos(ha).distanceTo(wpos(fa));
+    const dv = target.clone().sub(s), d = Math.min(dv.length(), (a + b) * 0.995), dir = dv.normalize();
+    const along = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - along * along));
+    const perp = pole.clone().sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
+    aim(ua, fa, s.clone().add(dir.clone().multiplyScalar(along)).add(perp.multiplyScalar(h)));
+    aim(fa, ha, s.clone().add(dir.multiplyScalar(d)));
+  }
 
   // ── âncoras (CONTRATO: head, handL, handR) e adereços ──
   const palm = (sd) => { const h = holderOn(B[sd + '_Hand']); const f = wpos(B[sd + '_Finger2']).sub(wpos(B[sd + '_Hand'])).multiplyScalar(0.5);
@@ -456,32 +466,60 @@ export async function buildWorker(stage, app) {
     wheel.add(new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.04, 12).rotateX(Math.PI / 2), red)); }
   shadowed(valve);
 
-  // ── touca descartável de TNT (sanfonada, elástico na borda) — forneira ──
+  // ── touca descartável de TNT (forneira): franzida pelo elástico na linha do cabelo, volume solto caído atrás ──
   let touca = null;
   if (head?.frame && head.debug) {
-    const d = head.debug, cz = (d.zF + d.zB) / 2, rx = d.hw + 0.03, rz = (d.zF - d.zB) / 2 + 0.034, yc = -0.02, ry = d.T - yc + 0.045;
-    const rimY = (a) => { const c = Math.cos(a); return c > 0 ? -0.006 + 0.056 * c * c : -0.006 - 0.085 * c * c; };
-    const NA = 96, NE = 18, pos = [], uv = [], idx = [];
-    for (let j = 0; j <= NE; j++) for (let i = 0; i <= NA; i++) {
-      const a = (i / NA) * Math.PI * 2, t = j / NE, y0 = rimY(a), y = y0 + (yc + ry - y0) * Math.sin(t * Math.PI / 2);
-      const k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)), puff = 1 + 0.11 * Math.sin(t * Math.PI) + (0.022 * Math.sin(a * 7 + t * 9 + 1.3 * Math.sin(a * 3)) + 0.012 * Math.sin(a * 17 - t * 13)) * Math.sin(t * Math.PI) - 0.04 * Math.max(0, Math.cos(a)) * Math.sin(t * Math.PI);
-      const pleat = 1 + 0.06 * Math.pow(1 - t, 2.5) * Math.sin(a * 46 + 2 * Math.sin(a * 5)) - 0.03 * Math.pow(1 - t, 6);
-      const r = k * puff * pleat; pos.push(Math.sin(a) * rx * r, y + 0.006 * Math.sin(t * Math.PI), cz + Math.cos(a) * rz * r); uv.push(i / NA * 8, t * 2);
-    }
-    for (let j = 0; j < NE; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + NA + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cg = cv.getContext('2d'); const im = cg.createImageData(128, 128);
-    for (let i = 0; i < im.data.length; i += 4) { const v = 150 + Math.random() * 105; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; } cg.putImageData(im, 0, 0);
+    const d = head.debug, cz = (d.zF + d.zB) / 2 - 0.004, yc = -0.012;
+    const rx0 = d.hw + 0.006, rz0 = (d.zF - d.zB) / 2 + 0.006, ry0 = d.T + 0.006 - yc;
+    let sd = 7; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+    const ph = Array.from({ length: 8 }, () => rnd() * 6.283);
+    // linha do elástico: testa (~5,5 cm acima dos olhos), acima das orelhas, nuca baixa
+    const rimY = (a, drop = 0) => { const c = Math.cos(a); return (c > 0 ? 0.03 + 0.027 * c * c : 0.03 - 0.108 * c * c) - drop + 0.003 * Math.sin(a * 3 + ph[0]); };
+    const skull = (a, y) => { const k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry0) ** 2)); return V3(Math.sin(a) * rx0 * k, y, cz + Math.cos(a) * rz0 * k); };
+    const NA = 144, NE = 26;
+    const mk = (offF, rimDrop, colorF) => {
+      const pos = [], uv = [], col = [], idx = [];
+      for (let j = 0; j <= NE; j++) for (let i = 0; i <= NA; i++) {
+        const a = (i / NA) * Math.PI * 2, t = j / NE, y0 = rimY(a, rimDrop), yT = yc + ry0, y = y0 + (yT - y0) * Math.sin(t * Math.PI / 2);
+        const p = skull(a, y), n = V3(p.x / (rx0 * rx0), (p.y - yc) / (ry0 * ry0), (p.z - cz) / (rz0 * rz0)).normalize();
+        const o = offF(a, t); p.addScaledVector(n, o.r); p.y += o.dy; p.z += o.dz;
+        pos.push(p.x, p.y, p.z); uv.push(i / NA * 14, t * 3.5); const cc = colorF(a, t); col.push(cc, cc, cc);
+      }
+      for (let j = 0; j < NE; j++) for (let i = 0; i < NA; i++) { const a = j * (NA + 1) + i, b = a + NA + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+    };
+    const hairR = (a, t) => 0.0015 + 0.007 * Math.sin(Math.PI * t) * (1 + 0.6 * Math.max(0, -Math.cos(a))) + 0.014 * Math.exp(-(((a - Math.PI) / 0.7) ** 2) - (((t - 0.3) / 0.22) ** 2));
+    const capOff = (a, t) => {
+      const back = Math.max(0, -Math.cos(a)), s = Math.sin(Math.PI * Math.min(1, t * 1.15));
+      // franzido do elástico: pregas finas e irregulares junto à borda, abrindo em rugas largas na copa
+      const pf = Math.sin(a * 58 + 2.2 * Math.sin(a * 7 + ph[1]) + ph[2]); const fine = Math.sign(pf) * Math.pow(Math.abs(pf), 0.55) * 0.0042 * Math.pow(1 - t, 2.2);
+      const wr = (0.0075 * Math.sin(a * 9 + t * 4 + ph[3]) + 0.005 * Math.sin(a * 5 - t * 7 + ph[4]) + 0.0035 * Math.sin(a * 17 + t * 11 + ph[5])) * s;
+      const bun = 0.026 * Math.exp(-(((a - Math.PI) / 0.75) ** 2) - (((t - 0.32) / 0.24) ** 2));
+      const r = 0.0035 + 0.022 * Math.pow(s, 0.8) * (1 + 0.55 * back) + bun + fine + wr + 0.004 * Math.sin(a + ph[6]) * s;
+      return { r: Math.max(r, hairR(a, t) + 0.0045), dy: -0.016 * back * s * (1 - 0.5 * t), dz: -0.008 * back * s };
+    };
+    const capCol = (a, t) => { const back = Math.max(0, -Math.cos(a)); return 0.9 + 0.08 * Math.min(1, t * 2.5) - 0.04 * back * (1 - t); };
+    const g = mk(capOff, 0, capCol);
+    // relevo do TNT (polipropileno spunbond: pontos gravados em losango + fibras)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const cg = cv.getContext('2d'); cg.fillStyle = '#9a9a9a'; cg.fillRect(0, 0, 128, 128);
+    for (let k = 0; k < 1400; k++) { const v = (90 + rnd() * 120) | 0; cg.strokeStyle = `rgba(${v},${v},${v},0.5)`; cg.lineWidth = 0.6; cg.beginPath(); const x = rnd() * 128, y = rnd() * 128, an = rnd() * 6.3; cg.moveTo(x, y); cg.lineTo(x + Math.cos(an) * 9, y + Math.sin(an) * 9); cg.stroke(); }
+    cg.fillStyle = '#4a4a4a'; for (let y = 0; y < 128; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < 128; x += 8) { cg.beginPath(); cg.ellipse(x, y, 1.6, 1.1, 0.785, 0, 7); cg.fill(); }
     const bt = new THREE.CanvasTexture(cv); bt.wrapS = bt.wrapT = THREE.RepeatWrapping;
-    const net = document.createElement('canvas'); net.width = net.height = 64; { const ng = net.getContext('2d'); ng.strokeStyle = '#fff'; ng.lineWidth = 6; ng.beginPath(); ng.moveTo(0, 32); ng.lineTo(32, 0); ng.lineTo(64, 32); ng.lineTo(32, 64); ng.closePath(); ng.stroke(); }
-    const nt = new THREE.CanvasTexture(net); nt.wrapS = nt.wrapT = THREE.RepeatWrapping; nt.repeat.set(7, 4);
-    const tm = new THREE.MeshPhysicalMaterial({ color: 0xf7f7f4, roughness: 0.85, sheen: 0.6, sheenColor: new THREE.Color(0xffffff), alphaMap: nt, transparent: true, depthWrite: false, opacity: 0.9, side: THREE.DoubleSide });
-    const em = new THREE.MeshPhysicalMaterial({ color: 0xf2f2ee, roughness: 0.8, sheen: 0.5, sheenColor: new THREE.Color(0xffffff) });
-    touca = new THREE.Group(); touca.name = 'touca'; touca.add(new THREE.Mesh(g, tm));
-    const inner = new THREE.Mesh(g.clone().scale(0.93, 1, 0.93).translate(0, -0.006, cz * 0.07), new THREE.MeshPhysicalMaterial({ color: 0x24160f, roughness: 0.55, sheen: 0.8, sheenColor: new THREE.Color(0x6a4a36), bumpMap: bt, bumpScale: 1.2 }));
-    inner.position.y = -0.004; touca.add(inner);
-    const rim = []; for (let i = 0; i <= 160; i++) { const a = i / 160 * Math.PI * 2, y = rimY(a), k = Math.sqrt(Math.max(0, 1 - ((y - yc) / ry) ** 2)) * (0.985 + 0.012 * Math.sin(a * 46)); rim.push(V3(Math.sin(a) * rx * k, y + 0.002, cz + Math.cos(a) * rz * k)); }
-    touca.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 240, 0.0062, 8, true), em));
+    const tm = new THREE.MeshPhysicalMaterial({ color: 0xf5f5f2, vertexColors: true, roughness: 0.93, sheen: 0.45, sheenColor: new THREE.Color(0xffffff), sheenRoughness: 0.85,
+      bumpMap: bt, bumpScale: 0.35, side: THREE.DoubleSide, specularIntensity: 0.25 });
+    // leve translucidez: a luz "vaza" pelo TNT fino (mais escuro onde o cabelo preso está logo abaixo)
+    tm.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.indirectDiffuse += diffuseColor.rgb * 0.06; reflectedLight.directDiffuse *= 0.97;'); };
+    touca = new THREE.Group(); touca.name = 'touca'; const capM = new THREE.Mesh(g, tm); touca.add(capM);
+    // cabelo preso por baixo: aparece só a linha do cabelo junto à testa/têmporas
+    const hairIn = mk((a, t) => ({ r: hairR(a, t), dy: -0.016 * Math.max(0, -Math.cos(a)) * Math.sin(Math.PI * t) * (1 - 0.5 * t) * 0.9, dz: -0.008 * Math.max(0, -Math.cos(a)) * Math.sin(Math.PI * t) * 0.9 }),
+      0.009, () => 1);
+    const inner = new THREE.Mesh(hairIn, new THREE.MeshPhysicalMaterial({ color: 0x24160f, roughness: 0.6, sheen: 0.7, sheenColor: new THREE.Color(0x6a4a36), bumpMap: bt, bumpScale: 0.8 }));
+    touca.add(inner);
+    // elástico fino (canal franzido) na borda
+    const rim = []; for (let i = 0; i <= 200; i++) { const a = i / 200 * Math.PI * 2, y = rimY(a), p = skull(a, y), n = V3(p.x / (rx0 * rx0), (p.y - yc) / (ry0 * ry0), (p.z - cz) / (rz0 * rz0)).normalize();
+      rim.push(p.addScaledVector(n, 0.0042 + 0.0012 * Math.sin(a * 58 + ph[2]))); }
+    touca.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rim, true), 400, 0.0019, 6, true), new THREE.MeshPhysicalMaterial({ color: 0xeeeeea, roughness: 0.75 })));
     shadowed(touca); head.frame.add(touca);
   }
 
@@ -542,7 +580,13 @@ export async function buildWorker(stage, app) {
     // alça do pescoço e cordão da cintura com laço nas costas
     const zN = zf(136) + 2.4;
     const strapP = [[10.5, 136.5, zN - 0.6], [8.6, 143, zN - 2.2], [6.8, 148, -2.5], [3.5, 150.2, -7.5], [0, 150.6, -9.0], [-3.5, 150.2, -7.5], [-6.8, 148, -2.5], [-8.6, 143, zN - 2.2], [-10.5, 136.5, zN - 0.6]].map((p) => V3(...p));
-    toBone(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(strapP), 48, 0.75, 6), B.Spine2);
+    { // fita plana de ~2 cm rente ao pescoço (não tubo)
+      const cv3 = new THREE.CatmullRomCurve3(strapP.map((p) => (p.y > 140 ? V3(p.x * 0.92, p.y, p.z + 0.4) : p))), NS = 64, pos = [], idx = [];
+      for (let k = 0; k <= NS; k++) { const u = k / NS, p = cv3.getPointAt(u), tg = cv3.getTangentAt(u), nO = V3(p.x, 0, p.z + 3.0).normalize();
+        nO.sub(tg.clone().multiplyScalar(nO.dot(tg))).normalize(); const bn = tg.clone().cross(nO).normalize();
+        for (const [sw, sn] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const q = p.clone().addScaledVector(bn, sw * 1.0).addScaledVector(nO, sn * 0.08); pos.push(q.x, q.y, q.z); } }
+      for (let k = 0; k < NS; k++) for (let e = 0; e < 4; e++) { const a0 = k * 4 + e, b0 = k * 4 + (e + 1) % 4; idx.push(a0, a0 + 4, b0, b0, a0 + 4, b0 + 4); }
+      const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setIndex(idx); sg.computeVertexNormals(); toBone(sg, B.Spine2); }
     // cintura: frente/costas/largura medidas na malha; se a medida das costas falhar (valor sentinela 99) o anel virava um
     // laço gigante fora do corpo — usa profundidade típica (~20 cm) e largura limitada a 12–17 cm de meia-largura.
     const yW = 101.5, zFr = zf(yW) + 1.6;
@@ -589,7 +633,7 @@ export async function buildWorker(stage, app) {
     if (touca) touca.visible = w; valve.visible = !w; if (P.hair) P.hair.visible = false;
     if (bun) { bun.visible = !w; bun.userData.muffs.forEach((m) => (m.visible = !w)); }
     apron.parts.forEach((m) => (m.visible = w));
-    uni?.setTwill?.(w ? 0.25 : 1);
+    uni?.setTwill?.(w ? 0.22 : 0.5);
   }
   applyEnv(app?.state?.env || 'fornos');
   app?.on?.('env', (e) => applyEnv(e));
@@ -609,13 +653,48 @@ export async function buildWorker(stage, app) {
   const sst = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
   const L = { pos: new THREE.Vector2(), head: 0, v: 0, path: null, pi: 0, mode: 'stand', queue: [], phase: 0, walkW: 0, sitW: 0, sitT: 0, from: null, to: null,
     st: null, act: 'A2', look: false, actT: 0, turnTo: 0, hipSeat: 0.54, patrol: null, pIdx: 0, wait: 0 };
+  const F = { L: { p: new THREE.Vector2(), yaw: 0, lift: 0, u: 0 }, R: { p: new THREE.Vector2(), yaw: 0, lift: 0, u: 0 } }, G = { foot: null, u: 0, from: new THREE.Vector2(), fromYaw: 0, dur: 0.5, last: 'R' };
+  const restFoot = (sd, x, z, h) => { const fr = footRest[sd], c = Math.cos(h), s = Math.sin(h); return new THREE.Vector2(x + fr.x * c + fr.z * s, z - fr.x * s + fr.z * c); };
+  function planFeet(dt) {
+    const moving = L.mode === 'walk' || L.mode === 'turn';
+    if (L.sitW > 0.02) { G.foot = null; for (const sd of ['L', 'R']) { F[sd].p.copy(restFoot(sd, L.pos.x, L.pos.y, L.head)); F[sd].yaw = L.head; F[sd].lift = 0; } return; }
+    const hT = L.mode === 'turn' ? L.head + Math.sign(wrap(L.turnTo - L.head)) * Math.min(0.7, Math.abs(wrap(L.turnTo - L.head))) : L.head;
+    const fw = new THREE.Vector2(Math.sin(L.head), Math.cos(L.head));
+    const tgtOf = (sd, u) => { if (L.mode !== 'walk') return restFoot(sd, L.pos.x, L.pos.y, hT);
+      const lead = Math.min(L.rem ?? 9, L.v * G.dur * (1 - u) + 0.5 * L.v * G.dur); return restFoot(sd, L.pos.x + fw.x * lead, L.pos.y + fw.y * lead, L.head); };
+    if (!G.foot) {
+      const err = (sd) => F[sd].p.distanceTo(restFoot(sd, L.pos.x, L.pos.y, L.head)) + 0.3 * Math.abs(wrap(F[sd].yaw - L.head));
+      if (moving || err('L') > 0.05 || err('R') > 0.05) {
+        const sd = moving ? (G.last === 'L' ? 'R' : 'L') : (err('L') > err('R') ? 'L' : 'R');
+        G.foot = sd; G.u = 0; G.from.copy(F[sd].p); G.fromYaw = F[sd].yaw; G.dur = L.mode === 'walk' ? Math.min(0.7, Math.max(0.5, 0.6 / Math.max(L.v, 0.3))) : 0.42;
+      }
+    }
+    if (G.foot) { const sd = G.foot, f = F[sd]; G.dur = L.mode === 'walk' ? Math.min(0.65, Math.max(0.48, 0.55 / Math.max(L.v, 0.45))) : 0.42; G.u = Math.min(1, G.u + dt / G.dur); const e = sst(G.u);
+      f.p.copy(G.from).lerp(tgtOf(sd, G.u), e); f.yaw = G.fromYaw + wrap((L.mode === 'walk' ? L.head : hT) - G.fromYaw) * e; f.u = G.u;
+      f.lift = Math.sin(Math.PI * G.u) * (L.mode === 'walk' ? 0.075 : 0.04);
+      if (G.u >= 1) { f.lift = 0; G.last = sd; G.foot = null; } }
+  }
   const next = () => { const f = L.queue.shift(); if (f) f(); else L.mode = L.sitW > 0.5 ? 'seated' : 'stand'; };
-  const walk = (pts) => () => { L.path = pts.map((p) => new THREE.Vector2(p[0] ?? p.x, p[1] ?? p.y)); L.pi = 0; L.mode = 'walk'; };
+  const walk = (pts) => () => { L.path = pts.map((p) => new THREE.Vector2(p[0] ?? p.x, p[1] ?? p.y)); L.pi = 0; L.mode = 'walk';
+    const t1 = L.path.find((q) => q.distanceTo(L.pos) > 0.08); if (t1) { const hd = Math.atan2(t1.x - L.pos.x, t1.y - L.pos.y); if (Math.abs(wrap(hd - L.head)) > 0.6) { L.turnTo = L.head + wrap(hd - L.head); L.mode = 'turn'; L.queue.unshift(() => { L.mode = 'walk'; }); } } };
+  const navWalk = (tg) => () => { const nav = navFor(envOf(L.st)); const p = nav?.plan(L.pos.clone(), new THREE.Vector2(tg[0], tg[1]), tripodObs()); walk(p || [[L.pos.x, L.pos.y], tg])(); };
   const turn = (r) => () => { L.turnTo = r; L.mode = 'turn'; };
   const sitDown = (id) => () => { const s = ST[id]; L.from = L.pos.clone(); L.to = new THREE.Vector2(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.hipSeat = SEAT[id] + 0.09; L.sitT = 0; L.mode = 'sitdown'; };
   const standUp = () => () => { L.from = L.pos.clone(); const s = ST[L.st]; L.to = s ? standOf(L.st) : L.pos.clone(); L.sitT = 0; L.mode = 'standup'; };
+  const NAV = {}, NAVB = { fornos: { x0: -8, x1: 8.6, z0: -6, z1: 6 }, caldeiras: { x0: 30, x1: 56, z0: -10, z1: 10 } };
+  let navMod = null; import('./worker_nav.js').then((m) => (navMod = m)).catch(() => {});
+  function navFor(e) {
+    if (NAV[e] !== undefined || !navMod || envCur !== e) return NAV[e] || null;
+    try { const skipSet = new Set([group, props, app?.meter?.rig, app?.kit?.group].filter(Boolean));
+      NAV[e] = navMod.buildNav(stage.scene, { ...NAVB[e], R: 0.3, skip: (o) => skipSet.has(o) || o.userData?.noNav || o.isLight || o.isPoints || o.isSprite }); }
+    catch (err) { console.warn('[worker] nav:', err); NAV[e] = null; }
+    return NAV[e];
+  }
+  const tripodObs = () => { const r = app?.meter?.rig; if (!r) return []; const p = r.getWorldPosition(V3()); return [{ x: p.x, z: p.z, r: 0.28 }]; };
   function route(fromId, toId, cur) {
-    const e = envOf(toId), pts = [[cur.x, cur.y]];
+    const e = envOf(toId), sp0 = standOf(toId), nav = navFor(e);
+    if (nav) { const pth = nav.plan(cur, sp0, tripodObs()); if (pth && pth.length >= 2) return pth; }
+    const pts = [[cur.x, cur.y]];
     if (fromId && CHAIN[fromId]) pts.push(...CHAIN[fromId]);
     pts.push(HUB[e], ...[...CHAIN[toId]].reverse()); const sp = standOf(toId); pts.push([sp.x, sp.y]);
     return pts.filter((p, i) => i === 0 || Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) > 0.05);
@@ -628,6 +707,7 @@ export async function buildWorker(stage, app) {
       L.queue = []; L.st = id; L.head = s.workerRotY; L.v = 0; L.walkW = 0;
       if (s.seated) { L.pos.set(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.sitW = 1; L.hipSeat = SEAT[id] + 0.09; L.mode = 'seated'; }
       else { L.pos.set(s.worker[0], s.worker[2]); L.sitW = 0; L.mode = 'stand'; }
+      for (const sd of ['L', 'R']) { F[sd].p.copy(restFoot(sd, L.pos.x, L.pos.y, L.head)); F[sd].yaw = L.head; F[sd].lift = 0; } G.foot = null;
       startPatrol(); return;
     }
     if (id === L.st && L.mode !== 'walk' && !L.patrol) { startPatrol(); return; }
@@ -645,7 +725,7 @@ export async function buildWorker(stage, app) {
     if (L.mode === 'walk') {
       const tgt = L.path[L.pi], d = tgt.clone().sub(L.pos), dist = d.length();
       if (dist < 0.04) { L.pi++; if (L.pi >= L.path.length) { L.v = 0; next(); } return 0; }
-      let rem = dist; for (let k = L.pi + 1; k < L.path.length; k++) rem += L.path[k].distanceTo(L.path[k - 1]);
+      let rem = dist; for (let k = L.pi + 1; k < L.path.length; k++) rem += L.path[k].distanceTo(L.path[k - 1]); L.rem = rem;
       const dh = wrap(Math.atan2(d.x, d.y) - L.head); L.head += Math.sign(dh) * Math.min(Math.abs(dh), 4.2 * dt);
       const vmax = Math.min(1.1, Math.sqrt(2 * 1.4 * rem) + 0.12) * (Math.abs(dh) > 1.0 ? 0.35 : 1);
       L.v += Math.sign(vmax - L.v) * Math.min(Math.abs(vmax - L.v), 2.0 * dt);
@@ -657,10 +737,17 @@ export async function buildWorker(stage, app) {
       L.sitW = L.mode === 'sitdown' ? k : 1 - k; if (L.sitT >= 1) next(); return 0;
     }
     if (L.mode === 'stand' && L.patrol) { L.wait -= dt; if (L.wait < 0) { L.pIdx = (L.pIdx + 1) % L.patrol.length; const tg = L.patrol[L.pIdx];
-      const back = L.pIdx === 0, isC = L.st === 'caldeira'; L.queue = [walk([[L.pos.x, L.pos.y], tg]), ...(back ? [turn(ST[L.st].workerRotY)] : tg[2] != null ? [turn(tg[2])] : []), () => { L.wait = back ? (isC ? 14 : 2.5) : (tg[3] ?? 1.0); L.mode = 'stand'; }]; next(); } }
+      const back = L.pIdx === 0, isC = L.st === 'caldeira'; L.queue = [navWalk(tg), ...(back ? [turn(ST[L.st].workerRotY)] : tg[2] != null ? [turn(tg[2])] : []), () => { L.wait = back ? (isC ? 14 : 2.5) : (tg[3] ?? 1.0); L.mode = 'stand'; }]; next(); } }
     return 0;
   }
 
+  let wheelSearched = false;
+  function findWheel() { if (wheelSearched || !app?.cald?.group) return; wheelSearched = true;
+    const W0 = V3(ST.valvulas.worker[0], 1.4, ST.valvulas.worker[2]), v = V3(); let best = null, bd = 0.8;
+    app.cald.group.traverse((o) => { const hx = o.material?.color?.getHex?.(); if (!o.isMesh || (hx !== 0xc3211b && hx !== 0x1f56b0)) return;
+      const P2 = o.geometry.attributes.position; o.updateWorldMatrix(true, false);
+      for (let i = 0; i < P2.count; i += 3) { v.fromBufferAttribute(P2, i).applyMatrix4(o.matrixWorld); if (v.y < 0.95 || v.y > 1.85) continue; const d = Math.hypot(v.x - W0.x, v.z - W0.z); if (d < bd) { bd = d; best = v.clone(); } } });
+    if (best) { valve.userData.c.copy(best); valve.visible = false; valve.userData.real = true; } }
   // ── pose por atividade ──
   const BP = (x, y, z) => { const c = Math.cos(L.head), s = Math.sin(L.head); return V3(L.pos.x + x * c + z * s, y, L.pos.y - x * s + z * c); };
   const S = { look: V3(0, 1.5, 5), lean: 0, twist: 0, hL: null, hR: null, wL: 0, wR: 0, blinkT: 2.5, blink: 0, rot: 0 };
@@ -673,14 +760,14 @@ export async function buildWorker(stage, app) {
     if (env === 'caldeiras') P.glove = 2;
     if (env === 'fornos') {
       if (a === 'A1' && L.st === 'forno' && !moving) {
-        P.glove = 1; P.tray = true; P.gripL = P.gripR = 0.85;
+        P.glove = 1; P.tray = true; P.gripL = P.gripR = 0.85; P.fdirL = P.fdirR = 'in';
         const door = app?.machines?.doorOpen?.('forno1') ?? 0;
         let ext = 0; if (door > 0.6) { const u = (T % 7) / 7; ext = u < 0.3 ? sst(u / 0.3) : u < 0.45 ? 1 : u < 0.75 ? 1 - sst((u - 0.45) / 0.3) : 0; P.baked = u >= 0.45 || u < 0.02; }
         P.hL = BP(0.29, 1.0 + 0.03 * ext, 0.3 + 0.36 * ext); P.hR = BP(-0.29, 1.0 + 0.03 * ext, 0.3 + 0.36 * ext); P.lean = 0.08 + 0.32 * ext;
         const pb = app?.machines?.panelButton?.getWorldPosition?.(V3()) || BP(-0.5, 1.5, 0.8);
         P.look = ext > 0.1 ? BP(0, 1.05, 0.9) : (Math.floor(T / 3.5) % 3 === 1 ? pb : BP(0.1, 1.15, 0.85));
       } else if ((a === 'A4' || (a === 'A1' && moving)) ) {
-        P.tray = true; P.gripL = P.gripR = 0.85; P.baked = a === 'A1'; P.glove = a === 'A1' ? 1 : 0;
+        P.tray = true; P.gripL = P.gripR = 0.85; P.fdirL = P.fdirR = 'in'; P.baked = a === 'A1'; P.glove = a === 'A1' ? 1 : 0;
         P.hL = BP(0.29, 1.0, 0.3); P.hR = BP(-0.29, 1.0, 0.3); P.lean = 0.04;
       } else if (a === 'A2' && L.st === 'bancada' && !moving) {
         const w = (2 * Math.PI) / 1.25, roll = (T % 12) > 8.5, s = Math.sin(T * w);
@@ -702,10 +789,10 @@ export async function buildWorker(stage, app) {
         if (u < 4) P.look = V3(35.42, 2.3, -1.44); else if (u < 7) P.look = V3(36.85, 3.48, -2.1);
         else if (u < 11) { P.look = V3(36.36, 1.49, -1.0); P.lean = 0.22; } else { P.look = V3(36.0, 1.25, -1.25); P.lean = 0.2; P.hL = V3(36.0, 1.28, -1.22); P.gripL = 0.8; }
       } else if (a === 'A2' && L.st === 'valvulas' && !moving) {
-        const c = valve.userData.c, per = 2.2, u = (T % per) / per, rot = u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7 * (1 - sst((u - 0.75) / 0.25));
+        findWheel(); const c = valve.userData.c, per = 2.2, u = (T % per) / per, rot = u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7 * (1 - sst((u - 0.75) / 0.25));
         S.rot += (u < 0.75 ? 1 : 0) * 0.0; valve.userData.wheel.rotation.z = -(Math.floor(T / per) * 0.7 + (u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7));
         const ang = (b) => V3(c.x + Math.cos(b) * 0.16, c.y + Math.sin(b) * 0.16, c.z + 0.025);
-        P.hL = ang(Math.PI - 0.55 - rot); P.hR = ang(0.55 - rot); P.gripL = P.gripR = 0.9; P.lean = 0.1; P.look = c.clone();
+        P.hL = ang(Math.PI - 0.55 - rot); P.hR = ang(0.55 - rot); P.gripL = P.gripR = 0.95; P.fdirL = P.fdirR = c.clone(); P.lean = 0.1; P.look = c.clone();
       } else if (a === 'A3' && L.mode === 'seated') {
         P.book = true; P.pen = true; P.lean = 0.32;
         const bk = BP(0.03, SEAT.controle + 0.27, 0.5), wr = (T % 6) < 4.5;
@@ -723,13 +810,14 @@ export async function buildWorker(stage, app) {
     dt = Math.min(dt || 0, 0.1); L.actT += dt;
     for (const [b, qr] of rest) b.quaternion.copy(qr);
     for (const b of lidRest) b.position.copy(restPos.get(b));
-    const ds = locomotion(dt);
-    L.phase += (2 * Math.PI * ds) / 1.3;
+    locomotion(dt); planFeet(dt);
     L.walkW = smN(L.walkW, L.mode === 'walk' ? Math.min(1, L.v / 0.55) : L.mode === 'turn' ? 0.45 : 0, 7, dt);
-    const ww = L.walkW, sw = L.sitW, ph = L.phase;
-    const bob = ww * (0.018 * Math.cos(2 * ph) - 0.02);
-    const sitDrop = (hipRest - L.hipSeat) * sw + (1 - ww) * (1 - sw) * 0.006;
-    group.position.set(L.pos.x, bob - sitDrop, L.pos.y);
+    const ww = L.walkW, sw = L.sitW, gu = G.foot ? G.u : 0, gs = G.foot === 'L' ? 1 : G.foot === 'R' ? -1 : 0;
+    const ph = gs * Math.PI * gu; // fase só para tronco
+    const idle = (1 - ww) * (1 - sw), shiftLat = idle * (0.022 * Math.sin(t * 0.37) + 0.006 * Math.sin(t * 1.3));
+    const bob = (G.foot ? -0.014 * Math.cos(2 * Math.PI * gu) : 0) * ww - 0.05 * ww;
+    const sitDrop = (hipRest - L.hipSeat) * sw + idle * 0.02 + 0.003 * Math.sin(t * 2 * Math.PI / 4.2) * idle;
+    group.position.set(L.pos.x + Math.cos(L.head) * shiftLat, bob - sitDrop, L.pos.y - Math.sin(L.head) * shiftLat);
     group.rotation.y = L.head; group.updateMatrixWorld(true); gqNow.copy(group.quaternion);
     const side = W(1, 0, 0), fwd = W(0, 0, 1), P = activityPose(t), br = Math.sin(t * 2 * Math.PI / 4.2);
     // pelve e tronco
@@ -737,17 +825,25 @@ export async function buildWorker(stage, app) {
     S.lean = smN(S.lean, P.lean, 4, dt);
     rotW(B.Spine, Y, -0.07 * Math.sin(ph) * ww); rotW(B.Spine1, Y, -0.06 * Math.sin(ph) * ww);
     rotW(B.Spine1, side, S.lean * 0.55 + 0.03 * ww + br * 0.01); rotW(B.Spine2, side, S.lean * 0.45 + br * 0.014);
-    // pernas: caminhada (oscilador) + sentar (quadril/joelho 90°)
-    const phiS = 0.12, cs = (L.hipSeat - ankH - Lc * Math.cos(phiS)) / Lt, thS = Math.acos(Math.max(-1, Math.min(1, cs)));
-    let maxTh = -1;
-    for (const [sd, off, sx] of [['L', 0, 1], ['R', Math.PI, -1]]) {
-      const p = ph + off, A = 0.36 * ww, th = A * Math.sin(p) * (1 - sw) + thS * sw + (1 - ww) * (1 - sw) * 0.06;
-      const knee = (ww * (0.06 + 0.9 * Math.pow(Math.max(0, Math.cos(p)), 2))) * (1 - sw) + (thS - phiS) * sw + (1 - ww) * (1 - sw) * 0.12;
-      rotW(B[sd + '_Thigh'], side, -th); rotW(B[sd + '_Thigh'], fwd, -sx * 0.07 * sw);
-      rotW(B[sd + '_Calf'], side, knee);
-      rotW(B[sd + '_Foot'], side, (th - knee) - 0.12 * ww * Math.max(0, Math.cos(p)) * (1 - sw));
-      maxTh = Math.max(maxTh, th);
+    // pernas: IK até os pés plantados (planejador de passos) ⟷ sentada (quadril/joelho ~90°), misturadas por sitW
+    const legB = ['L_Thigh', 'L_Calf', 'L_Foot', 'R_Thigh', 'R_Calf', 'R_Foot'].map((n) => B[n]);
+    let qa = null;
+    if (sw < 0.999) {
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) { const f = F[sd];
+        ikB(B[sd + '_Thigh'], B[sd + '_Calf'], B[sd + '_Foot'], V3(f.p.x, ankH + f.lift, f.p.y), W(sx * 0.12, 0, 1).normalize());
+        const pitch = f.lift > 0 ? (0.4 * (1 - f.u) - 0.3 * f.u) * Math.sin(Math.PI * f.u) : 0;
+        setWQ(B[sd + '_Foot'], new THREE.Quaternion().setFromAxisAngle(Y, f.yaw).multiply(new THREE.Quaternion().setFromAxisAngle(V3(1, 0, 0), pitch)).multiply(footRest[sd].q)); }
+      qa = legB.map((b) => b.quaternion.clone());
     }
+    const phiS = 0.12, cs = (L.hipSeat - ankH - Lc * Math.cos(phiS)) / Lt, thS = Math.acos(Math.max(-1, Math.min(1, cs)));
+    if (sw > 0.001) {
+      legB.forEach((b) => b.quaternion.copy(rest.get(b))); B.Pelvis.updateMatrixWorld(true);
+      for (const [sd, sx] of [['L', 1], ['R', -1]]) { rotW(B[sd + '_Thigh'], side, -thS); rotW(B[sd + '_Thigh'], fwd, -sx * 0.07); rotW(B[sd + '_Calf'], side, thS - phiS); rotW(B[sd + '_Foot'], side, phiS); }
+      if (qa) legB.forEach((b, k) => b.quaternion.copy(qa[k].clone().slerp(b.quaternion, sw)));
+      B.Pelvis.updateMatrixWorld(true);
+    }
+    let maxTh = -1;
+    for (const sd of ['L', 'R']) { const d = wpos(B[sd + '_Calf']).sub(wpos(B[sd + '_Thigh'])); maxTh = Math.max(maxTh, Math.atan2(d.dot(fwd), -d.y)); }
     if (apron.skirtPivot) {
       const thp = -Math.min(1.35, Math.max(0, maxTh) * 0.9);
       // em pé/andando a saia inteira balança com a coxa (pivô); sentada, a curvatura passa para o tecido (vértices)
@@ -768,7 +864,8 @@ export async function buildWorker(stage, app) {
       }
     }
     // cabeça (antes dos braços: clavículas são filhas do pescoço)
-    smV(S.look, P.look, 3.5, dt);
+    S.sacT = (S.sacT ?? 0) - dt; if (S.sacT < 0) { S.sacT = 0.8 + Math.random() * 2.2; S.sac = V3((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.06, (Math.random() - 0.5) * 0.12); }
+    smV(S.look, P.look.clone().add(S.sac || V3()), 3.5, dt);
     { // Giro natural: o tronco (Spine1/Spine2) absorve o excesso acima de ~35°, o pescoço só um pouco (as clavículas são
       // filhas do pescoço — girá-lo muito deforma os ombros) e a cabeça no máximo ~45° em relação ao peito; alvo muito atrás
       // (> ~110°) é ignorado e ela olha para a frente, em vez de torcer o pescoço.
@@ -793,7 +890,7 @@ export async function buildWorker(stage, app) {
     for (const [sd, sx, tgt, grip, fdir] of [['L', 1, P.hL, P.gripL, P.fdirL], ['R', -1, P.hR, P.gripR, P.fdirR]]) {
       const key = 'h' + sd, wk = 'w' + sd;
       S[wk] = smN(S[wk], tgt ? 1 : 0, 5, dt); if (tgt) S[key] = S[key] ? smV(S[key], tgt, 9, dt) : tgt.clone();
-      const swing = 0.42 * Math.sin(ph + (sd === 'L' ? Math.PI : 0)) * ww;
+      const opp = F[sd === 'L' ? 'R' : 'L'].p, swing = Math.max(-0.5, Math.min(0.5, ((opp.x - L.pos.x) * fwd.x + (opp.y - L.pos.y) * fwd.z) / 0.3 * 0.4)) * ww;
       const sh = wpos(B[sd + '_UpperArm']);
       const elbowDown = sh.clone().add(W(sx * 0.11, -1, 0.02 + swing).normalize().multiplyScalar(0.27));
       const handDown = elbowDown.clone().add(W(sx * 0.06, -1, 0.22 + swing * 1.4 + 0.15 * sw).normalize().multiplyScalar(0.25));
@@ -802,7 +899,9 @@ export async function buildWorker(stage, app) {
       ik(sd, target, (L.mode === 'seated' && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
       if (fdir === 'point' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], PANEL, 0.85);
       if (fdir === 'down' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], wpos(B[sd + '_Hand']).add(W(0, -0.55, 1).normalize()), 0.7);
-      handPose(sd, grip * Math.max(S[wk], 0.15));
+      if (fdir === 'in' && S[wk] > 0.5 && S.hL && S.hR) aim(B[sd + '_Hand'], B[sd + '_Finger2'], S.hL.clone().add(S.hR).multiplyScalar(0.5).add(V3(0, -0.02, 0)).addScaledVector(fwd, 0.06), 0.55);
+      if (fdir?.isVector3 && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], fdir, 0.65);
+      handPose(sd, grip * Math.max(S[wk], 0.15) + 0.04 * Math.sin(t * 0.9 + (sd === 'L' ? 0 : 2)), sd === 'R' && P.pen && S[wk] > 0.5);
     }
     // adereços
     const showTray = P.tray && !!S.hL && !!S.hR && S.wL > 0.6;

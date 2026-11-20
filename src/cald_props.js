@@ -9,7 +9,7 @@ import * as TX from './cald_tex.js';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 export function buildProps(ctx) {
-  const { group, batch, M, cyl, box, sign } = ctx;
+  const { group, batch, inst, M, cyl, box, sign } = ctx;
 
   // ═════════════ SALA DE CONTROLE ═════════════
   {
@@ -144,7 +144,7 @@ export function buildProps(ctx) {
   rail([[47.75, 1.5], [49.6, 1.5]]); rail([[51.4, 1.5], [53.25, 1.5], [53.25, 3.7], [51.0, 3.7]]);
 
   // ═════════════ EXTINTORES (piso demarcado) + placas ═════════════
-  for (const [ex, ez, kind, n] of [[30.75, -3.0, 'pqs', V(1, 0, 0)], [55.3, 1.5, 'co2', V(-1, 0, 0)], [45.6, 9.3, 'pqs', V(0, 0, -1)]]) {
+  for (const [ex, ez, kind, n] of [[30.75, -3.0, 'pqs', V(1, 0, 0)], [55.3, 1.5, 'co2', V(-1, 0, 0)], [45.6, 9.3, 'pqs', V(0, 0, -1)], [54.95, -8.95, 'co2', V(-1, 0, 0)], [36.0, 9.35, 'pqs', V(0, 0, -1)]]) {
     const r = kind === 'co2' ? 0.075 : 0.09, hh = kind === 'co2' ? 0.68 : 0.5;
     box('steelDark', [ex, 0.03, ez], [0.32, 0.06, 0.32]);
     cyl('extRed', V(ex, 0.06, ez), V(ex, 0.06 + hh, ez), r, 24);
@@ -175,7 +175,7 @@ export function buildProps(ctx) {
 
   // ═════════════ MANUTENÇÃO: tambores, carrinho de ferramentas, escada, bancada, hidrante, quadro de gaxetas ═════════════
   for (const [x, z, k] of [[54.7, -2.4, 'drumBlue'], [55.3, -2.15, 'drumBlue'], [55.25, -2.85, 'drumBlack']]) { cyl(k, V(x, 0, z), V(x, 0.88, z), 0.29, 28); for (const y of [0.29, 0.58]) cyl(k, V(x, y - 0.01, z), V(x, y + 0.01, z), 0.297, 28); cyl('steelDark', V(x + 0.15, 0.88, z), V(x + 0.15, 0.895, z), 0.03, 10); }
-  { const x = 39.4, z = -0.95; box('toolRed', [x, 0.55, z], [0.75, 0.75, 0.45]); for (let k = 0; k < 4; k++) box('steelDark', [x, 0.3 + k * 0.17, z + 0.226], [0.6, 0.012, 0.004]); box('rubberMat', [x, 0.935, z], [0.74, 0.02, 0.44]);
+  { const x = 37.65, z = 0.3; box('toolRed', [x, 0.55, z], [0.75, 0.75, 0.45]); for (let k = 0; k < 4; k++) box('steelDark', [x, 0.3 + k * 0.17, z + 0.226], [0.6, 0.012, 0.004]); box('rubberMat', [x, 0.935, z], [0.74, 0.02, 0.44]);
     for (const [sx, sz] of [[-0.3, -0.18], [0.3, -0.18], [-0.3, 0.18], [0.3, 0.18]]) cyl('rubber', V(x + sx, 0.05, z + sz), V(x + sx, 0.12, z + sz), 0.05, 10);
     box('chrome', [x - 0.1, 0.955, z], [0.32, 0.018, 0.04], [0, 0.4, 0]); box('wheelRed', [x + 0.18, 0.96, z + 0.05], [0.2, 0.03, 0.06], [0, -0.3, 0]); cyl('chrome', V(x + 0.15, 0.95, z - 0.1), V(x + 0.15, 1.15, z - 0.1), 0.012, 8);
     cyl('steelDark', V(x - 0.38, 0.95, z - 0.2), V(x - 0.38, 1.0, z + 0.2), 0.012, 8); }
@@ -190,4 +190,47 @@ export function buildProps(ctx) {
   sign('auricular', V(HALL2.x1 - 0.45, 2.4, 0.0), V(-1, 0, 0), 0.34);
   sign('saida', V(45.95, 2.45, HALL2.z1 - 0.13), V(0, 0, -1), 0.4, 0.25);
   sign('luvas', V(47.4, 1.0, -8.32), V(0, 0, 1), 0.2);
+
+  // ═════════════ DENSIDADE: plataforma entre as caldeiras com escada, tanque de condensado, compressor, pallets, mangueiras ═════════════
+  {
+    // plataforma de topo entre as caldeiras (grade + guarda-corpo amarelo) e escada de acesso
+    const x0 = 37.85, x1 = 41.15, z0 = -6.0, z1 = -3.4, py = 3.15;
+    box('grating', [(x0 + x1) / 2, py, (z0 + z1) / 2], [x1 - x0, 0.04, z1 - z0]);
+    for (const z of [z0, z1]) box('struct', [(x0 + x1) / 2, py - 0.1, z], [x1 - x0, 0.16, 0.08]);
+    for (const x of [x0, x1]) box('struct', [x, py - 0.1, (z0 + z1) / 2], [0.08, 0.16, z1 - z0]);
+    for (const [x, z] of [[x0 + 0.06, z0 + 0.06], [x1 - 0.06, z0 + 0.06], [x0 + 0.06, z1 - 0.06], [x1 - 0.06, z1 - 0.06]]) box('struct', [x, py / 2, z], [0.1, py, 0.1]);
+    const sx0 = 38.5, sx1 = 39.3;
+    const up = (pts) => { for (let i = 0; i < pts.length - 1; i++) { const a = pts[i], b = pts[i + 1]; for (const yy of [0.55, 1.1]) cyl('paintYellow', V(a[0], py + yy, a[1]), V(b[0], py + yy, b[1]), 0.022, 8); cyl('paintYellow', V(a[0], py, a[1]), V(a[0], py + 1.1, a[1]), 0.024, 8); box('paintYellow', [(a[0] + b[0]) / 2, py + 0.07, (a[1] + b[1]) / 2], [Math.abs(b[0] - a[0]) + 0.02, 0.12, Math.abs(b[1] - a[1]) + 0.02]); } const l = pts[pts.length - 1]; cyl('paintYellow', V(l[0], py, l[1]), V(l[0], py + 1.1, l[1]), 0.024, 8); };
+    up([[sx1, z1], [x1, z1], [x1, z0], [x0, z0], [x0, z1], [sx0, z1]]);
+    // escada (45°) descendo para a frente, entre os painéis
+    const L = py, zs0 = z1, zs1 = z1 + L;
+    for (const x of [sx0, sx1]) { const d = V(0, -py, L).normalize(); batch.add('struct', G.unitBox(), G.alignY(V(x, py / 2, (zs0 + zs1) / 2), d, [0.05, Math.hypot(py, L), 0.18])); }
+    for (let k = 1; k < 16; k++) { const t = k / 16; box('grating', [(sx0 + sx1) / 2, py * (1 - t), zs0 + L * t], [sx1 - sx0 - 0.04, 0.03, 0.22]); }
+    for (const x of [sx0 - 0.04, sx1 + 0.04]) { cyl('paintYellow', V(x, py + 1.0, zs0), V(x, 1.0, zs1), 0.02, 8); cyl('paintYellow', V(x, py + 0.5, zs0), V(x, 0.5, zs1), 0.018, 8); cyl('paintYellow', V(x, 0, zs1), V(x, 1.0, zs1), 0.024, 8); }
+    // tanque de condensado de inox (vertical, polido) com escada marinheiro e respiro
+    const tx = 43.9, tz = 7.6, tR = 0.85;
+    batch.add('steel', G.shellGeo(tR, 2.3, { top: 'ell', bot: 'flat', seg: 64, sheetW: 0.8, sheetL: 1.0 }), G.mat4([tx, 0.25 + 1.15, tz]));
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.6; cyl('steel', V(tx + Math.cos(a) * (tR - 0.1), 0, tz + Math.sin(a) * (tR - 0.1)), V(tx + Math.cos(a) * (tR - 0.1), 0.3, tz + Math.sin(a) * (tR - 0.1)), 0.05, 10); }
+    for (const y of [0.9, 1.9]) batch.add('weld', G.cached('tkWeld', () => new THREE.TorusGeometry(tR + 0.002, 0.007, 6, 64)), G.mat4([tx, y, tz], [Math.PI / 2, 0, 0]));
+    cyl('steel', V(tx, 2.9, tz), V(tx, 3.4, tz), 0.05, 12); G.valve(batch, inst, M, V(tx, 3.15, tz), V(0, 1, 0), V(1, 0, 0), 0.04, { wheel: 'red' });
+    cyl('steel', V(tx + 0.3, 2.85, tz), V(tx + 0.3, 6.72, tz), 0.06, 14);
+    ctx.pipe('steel', [V(tx - tR + 0.05, 0.6, tz), V(tx - tR - 0.35, 0.6, tz), V(tx - tR - 0.35, 0.6, 9.55), V(tx - tR - 0.35, 2.55, 9.55)], 0.055, 0.2);
+    G.valve(batch, inst, M, V(tx - tR - 0.2, 0.6, tz), V(-1, 0, 0), V(0, 1, 0), 0.05, { wheel: 'blue' });
+    for (const zz of [tz - 0.2, tz + 0.2]) cyl('steelDark', V(tx + tR + 0.15, 0.2, zz), V(tx + tR + 0.15, 3.2, zz), 0.015, 6);
+    for (let y = 0.45; y < 3.1; y += 0.3) cyl('steelDark', V(tx + tR + 0.15, y, tz - 0.2), V(tx + tR + 0.15, y, tz + 0.2), 0.012, 6);
+    const gk = G.gauge(group, batch, M, TX.gaugeFace({ max: 4, red: 1.5, unit: 'kgf/cm²' }).tex, V(tx - 0.35, 1.6, tz - tR - 0.06), V(0, 0, -1), 0.08); ctx.needles.push({ n: gk.needle, ang: (v) => -(Math.PI * 0.75 + Math.PI * 1.5 * v / 4), v: 0.3, jit: 0.02, seed: 9.1 });
+    sign('quente', V(tx + 0.3, 1.3, tz - tR - 0.01), V(0, 0, -1), 0.2);
+    // compressor de ar (gabinete) + reservatório horizontal
+    box('cabinet', [47.4, 0.65, 9.2], [1.3, 1.3, 0.75]); box('steelDark', [47.4, 0.65, 8.82], [1.1, 0.9, 0.01]); box('paintDark', [47.4, 0.04, 9.2], [1.35, 0.08, 0.8]);
+    batch.add('pumpBlue', G.shellGeo(0.32, 1.1, { top: 'ell', bot: 'ell', seg: 40, sheetW: 1, sheetL: 1 }), G.mat4([47.0, 0.75, 7.95], [0, 0, Math.PI / 2]));
+    for (const x of [46.6, 47.4]) box('paintDark', [x, 0.22, 7.95], [0.1, 0.44, 0.5]);
+    ctx.pipe('paintBlue', [V(47.4, 1.3, 9.2), V(47.4, 1.6, 9.2), V(47.4, 1.6, 7.95), V(47.4, 1.07, 7.95)], 0.025, 0.1);
+    // pallets com tambores e sacos; mangueiras enroladas no piso
+    for (const [px, pz] of [[37.3, 8.9], [38.5, 8.9]]) { box('wood', [px, 0.07, pz], [1.15, 0.14, 0.95]); }
+    for (const [dx, dz, k] of [[37.0, 8.65, 'drumBlue'], [37.6, 8.65, 'drumBlue'], [37.0, 9.2, 'drumBlack'], [37.6, 9.2, 'drumBlue']]) { cyl(k, V(dx, 0.14, dz), V(dx, 1.02, dz), 0.28, 24); for (const y of [0.43, 0.72]) cyl(k, V(dx, y - 0.01, dz), V(dx, y + 0.01, dz), 0.287, 24); }
+    for (let k = 0; k < 6; k++) box('sack', [38.25 + (k % 2) * 0.55, 0.22 + Math.floor(k / 2) * 0.13, 8.9], [0.52, 0.13, 0.85], [0, (k % 3) * 0.04, 0]);
+    for (let k = 0; k < 5; k++) batch.add('rubber', G.cached('hoseC' + k, () => new THREE.TorusGeometry(0.3 + k * 0.035, 0.022, 8, 40)), G.mat4([46.0, 0.025 + k * 0.012, -5.9], [Math.PI / 2, 0, 0]));
+    ctx.pipe('rubber', [V(46.32, 0.03, -5.9), V(46.9, 0.03, -6.3), V(47.3, 0.03, -7.6), V(47.45, 0.4, -8.2)], 0.022, 0.3);
+    for (let k = 0; k < 4; k++) batch.add('wheelRed', G.cached('hoseR' + k, () => new THREE.TorusGeometry(0.22 + k * 0.03, 0.02, 8, 36)), G.mat4([30.18, 1.6, -1.2], [0, Math.PI / 2, 0]));
+  }
 }

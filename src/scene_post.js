@@ -56,7 +56,7 @@ void main(){
     float sd = texture2D(tDepth, uv).x; vec3 sp = viewPosAt(uv, sd); float sceneD = length(sp); float rayD = length(p - camPos);
     if (rayD > sceneD + 0.01 && rayD - sceneD < 0.15 + stepL * 1.6) {
       vec2 e = smoothstep(vec2(0.0), vec2(0.08), uv) * smoothstep(vec2(1.0), vec2(0.92), uv);
-      col = texture2D(tColor, uv).rgb; if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0); col = clamp(col, vec3(0.0), vec3(30.0)); hit = e.x * e.y * (1.0 - smoothstep(2.0, 4.5, t)); break;
+      col = texture2D(tColor, uv).rgb; if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0); col = clamp(col, vec3(0.0), vec3(3.0)); hit = e.x * e.y * (1.0 - smoothstep(2.0, 4.5, t)); break;
     }
     t += stepL; stepL *= 1.24;
   }
@@ -98,7 +98,7 @@ float roomShade(vec3 p){
   for (int r = 0; r < 4; r++) for (int c = 0; c < 6; c++) { vec2 q = p.xz - vec2(ledCols[c], ledRows[r]); near += exp(-dot(q, q) / 2.6); }
   if (dW < 0.03) { k *= mix(1.0, 0.74, smoothstep(2.0, 3.98, p.y)) * (0.86 + 0.22 * min(near, 1.2) * smoothstep(3.9, 1.6, p.y)); }
   else if (p.y < 0.006) { k *= 0.86 + 0.15 * min(near, 1.4); }
-  else if (dC < 0.02) { k *= 0.9 + 0.1 * min(near, 1.0); }
+  else if (dC < 0.02) { k *= 0.8 + 0.28 * min(near, 1.0); }
   return k;
 }
 void main(){
@@ -143,7 +143,7 @@ void main(){
       float zc = cNear * cFar / (cFar - d * (cFar - cNear));
       float wk = exp(-abs(zk - zc) / max(zc, 0.05) * 90.0) + 1e-4; ao += texture2D(tAO, u2).r * wk; aw += wk;
     }
-    ao = ao / max(aw, 1e-5); ao = mix(1.0, pow(ao, 1.5), aoAmt);
+    ao = ao / max(aw, 1e-5); ao = mix(1.0, pow(ao, 1.25), aoAmt * 0.8);
     if (useMask > 0.5) { float m = texture2D(tMask, vUv).r; if (m > 0.0 && abs(m - dist) < 0.05 * dist + 0.02) ao = 1.0; }
     col *= ao;
     if (dbg == 1) { gl_FragColor = vec4(vec3(ao), dist); return; }
@@ -163,7 +163,7 @@ void main(){
     for (int i = 0; i < ${MAXH}; i++) {
       if (i >= hazeN) break;
       vec4 P = hP[i]; float zf = P.y; if (r.z > -1e-3 || wp.z < zf) continue;
-      float t = (zf - wp.z) / r.z; vec3 q = wp + r * t; float b = 0.015 + t * 0.09;
+      float t = (zf - wp.z) / r.z; vec3 q = wp + r * t; float b = 0.12 + t * 0.32; // piso de rugosidade ~0,5: borrão largo (sem faixas por porta)
       float x0 = hMin[i].x + 0.08, x1 = hMax[i].x - 0.08;
       float m = smoothstep(x0 - b, x0 + b, q.x) * (1.0 - smoothstep(x1 - b, x1 + b, q.x)) * smoothstep(P.w - b, P.w + b, q.y) * (1.0 - smoothstep(P.z - b, P.z + b, q.y));
       em += glassCol * m * (1.0 + 2.5 * hOpen[i].x);
@@ -345,7 +345,7 @@ class MainPass extends Pass {
       hMin: { value: pad(this.hazeSrc, (h) => (h ? h.min : new THREE.Vector3())) }, hMax: { value: pad(this.hazeSrc, (h) => (h ? h.max : new THREE.Vector3())) },
       hP: { value: pad(this.hazeSrc, (h) => (h ? h.p : new THREE.Vector4())) },
       hOpen: { value: pad(this.hazeSrc, (h) => (h ? (h.open = new THREE.Vector4()) : new THREE.Vector4())) },
-      glassCol: { value: new THREE.Vector3(3.2, 1.5, 0.5) }, ledCol: { value: new THREE.Vector3(1.5, 1.45, 1.36) }, floorRefl: { value: P.floorRefl ?? 1 },
+      glassCol: { value: new THREE.Vector3(2.2, 1.0, 0.33) }, ledCol: { value: new THREE.Vector3(1.5, 1.45, 1.36) }, floorRefl: { value: P.floorRefl ?? 1 },
       // centro de cada PAR de painéis (borda comum entre as duas células), fileiras ajustadas à grade de 625 mm
       ledRows: { value: new THREE.Vector4(...HC.ledRows.map((z) => snapC(z, HC.z0))) },
       ledCols: { value: HC.ledCols.map((x) => snapC(x - 0.3125, HC.x0) + 0.3125) },
@@ -379,7 +379,7 @@ vD = length(mvPosition.xyz); }`,
     this.gtao.output = GTAOPass.OUTPUT.Off;
     this.gtao.setGBuffer(this.depthTex);
     this.gtao.updateGtaoMaterial({ radius: P.aoRadius, distanceExponent: 1.6, thickness: 1.0, scale: 1.0, samples: 8, distanceFallOff: 1.0 });
-    this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 4, normalPhi: 4, radius: 5, rings: 2, samples: 8 });
+    this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 3, normalPhi: 3, radius: 8, rings: 2, samples: 12 }); // desruído mais largo: sem manchas ruidosas em quinas/chapa xadrez
     this.composeA.uniforms.tAO.value = this.gtao.gtaoMap;
     this.w = 4; this.h = 4; this.time = 0;
   }

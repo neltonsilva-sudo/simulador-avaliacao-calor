@@ -48,7 +48,7 @@ export function tileTextures() {
       const b = Math.min(1, (e - G * 0.5) / 3.0); const bev = Math.sin(b * Math.PI / 2); // bisotê
       h = bev * 1.0 + (lx / P - 0.5) * t.tx * 0.55 + (ly / P - 0.5) * t.ty * 0.55 + (wav(x, y) - 0.5) * 0.5 + (wav2(x, y) - 0.5) * 0.05;
       const base = 236 + t.v * 255; col = [base + t.w * 255 + 1, base + 1, base - 3 - t.w * 140]; // branco levemente quente/frio por lote
-      rough = 18 + t.r * 16 + (1 - b) * 40;
+      rough = 40 + t.r * 22 + (1 - b) * 40; // esmalte acetinado: brilho pontual das luzes fica difuso (sem ponto flutuando)
     }
     H[y * S + x] = h;
     cid.data[k] = col[0]; cid.data[k + 1] = col[1]; cid.data[k + 2] = col[2]; cid.data[k + 3] = 255;

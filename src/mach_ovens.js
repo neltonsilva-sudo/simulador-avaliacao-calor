@@ -245,9 +245,10 @@ export function buildLastro4(o, ctx) {
     cavity(B, 'cav4', 'cav4t', 'cav4f', dx0, dx1, y0, y1, cz0, cz1 - 0.03);
     // lastro (pedra) e pães franceses
     B.box('stone', dx0 + 0.01, y0, cz0 + 0.02, dx1 - 0.01, y0 + 0.012, cz1 - 0.05, 0, 1);
-    for (let r = 0; r < 3; r++) for (let i = 0; i < 6; i++) {
-      const x = dx0 + 0.1 + i * (dx1 - dx0 - 0.2) / 5 + jit(0.012), z = cz1 - 0.26 - r * 0.4 + jit(0.03);
-      ctx.bread('roll', g, x, y0 + 0.012, z, Math.PI / 2 + jit(0.12), 2.1 + jit(0.12), 1.05 - r * 0.15);
+    // pão ~23 cm (roll = 17 cm × escala ~1,35), 7 por fileira, 4 fileiras sobre a pedra
+    for (let r = 0; r < 4; r++) for (let i = 0; i < 7; i++) {
+      const x = dx0 + 0.1 + i * (dx1 - dx0 - 0.2) / 6 + jit(0.01), z = cz1 - 0.22 - r * 0.3 + jit(0.025);
+      ctx.bread('roll', g, x, y0 + 0.012, z, Math.PI / 2 + jit(0.14), 1.35 + jit(0.08), 1.05 - r * 0.1);
     }
     // fileira de lâmpadas no alto da boca (reflexos pontilhados da FOTO 4)
     for (let i = 0; i < 6; i++) { const x = dx0 + 0.1 + i * (dx1 - dx0 - 0.2) / 5; B.cyl('lamp', 0.012, 0.008, [x, y1 - 0.004, cz1 - 0.12], 'y', 10); B.cyl('lamp', 0.016, 0.006, [x, y1 - 0.045, cz0 + 0.004], 'z', 12); }
@@ -322,10 +323,10 @@ export function buildLastro(o, ctx) {
     cavity(B, 'cav3', 'cav3t', 'cav3f', dx0, dx1, y0, y1, cz0, cz1 - 0.02);
     B.box('stone', dx0 + 0.01, y0, cz0 + 0.02, dx1 - 0.01, y0 + 0.012, cz1 - 0.04, 0, 1);
     // baguetes ao longo da profundidade
-    const n = 11;
-    for (let r = 0; r < 3; r++) for (let i = 0; i < n; i++) {
-      const x = dx0 + 0.12 + i * (dx1 - dx0 - 0.24) / (n - 1) + jit(0.01), z = cz1 - 0.3 - r * 0.45 + jit(0.03);
-      ctx.bread('roll', g, x, y0 + 0.012, z, Math.PI / 2 + jit(0.1), 2.2 + jit(0.12), 1.05 - r * 0.15);
+    const n = 12; // pão ~23 cm, 12 por fileira, 5 fileiras
+    for (let r = 0; r < 5; r++) for (let i = 0; i < n; i++) {
+      const x = dx0 + 0.11 + i * (dx1 - dx0 - 0.22) / (n - 1) + jit(0.01), z = cz1 - 0.24 - r * 0.32 + jit(0.025);
+      ctx.bread('roll', g, x, y0 + 0.012, z, Math.PI / 2 + jit(0.12), 1.38 + jit(0.08), 1.05 - r * 0.09);
     }
     for (let i = 0; i < 9; i++) { const x = dx0 + 0.12 + i * (dx1 - dx0 - 0.24) / 8; B.cyl('lamp', 0.012, 0.008, [x, y1 - 0.004, cz1 - 0.1], 'y', 10); B.cyl('lamp', 0.016, 0.006, [x, y1 - 0.05, cz0 + 0.004], 'z', 12); }
     ctx.glow(g, (dx0 + dx1) / 2, y1 - 0.05, cz1 - 0.15, 0.9, 0.55);
@@ -375,7 +376,7 @@ export function buildRotativo(o, ctx) {
   for (let i = 0; i < 30; i++) { const x = -W + 0.06 + i * (o.w - 0.12) / 29; B.box('steelSat', x - 0.004, 2.255, zF + 0.04, x + 0.004, 2.27, d + 0.1, 0); }
   B.box('steelSat', -0.2, H, 0.2, 0.2, 4.0, 0.6, 0.004);
   // painel de comando: tela azul clara + teclado (à esquerda da porta)
-  const rp = T.rotativoPanel(), rm = displayMaterial(rp, 1.6); ctx.mats.push(rm);
+  const rp = T.rotativoPanel(), rm = displayMaterial(rp, 2.4); ctx.mats.push(rm);
   const cw = px1 - px0 - 0.1, ch = cw * 2, cy = 1.42;
   B.box('black', px0 + 0.04, cy - ch / 2 - 0.02, zF + 0.02, px1 - 0.04, cy + ch / 2 + 0.02, zF + 0.04, 0.008);
   const rmesh = new THREE.Mesh(new THREE.PlaneGeometry(cw, ch), rm); rmesh.position.set((px0 + px1) / 2, cy, zF + 0.0405); g.add(rmesh);
@@ -403,7 +404,7 @@ export function buildRotativo(o, ctx) {
   const wx0 = -Lw / 2 - 0.1, wx1 = -Lw / 2 + 0.1, wy0 = 0.22, wy1 = 1.92;
   plate(D, 'steel', -Lw, oy0, 0, oy1 + 0.02, dth, dth, [[wx0, wy0, wx1, wy1]], 0.006);
   plate(D, 'black', wx0 - 0.02, wy0 - 0.02, wx1 + 0.02, wy1 + 0.02, dth + 0.004, 0.008, [[wx0 + 0.006, wy0 + 0.006, wx1 - 0.006, wy1 - 0.006]], 0.002);
-  D.plane('glass', wx1 - wx0, wy1 - wy0, [(wx0 + wx1) / 2, (wy0 + wy1) / 2, dth - 0.01]);
+  D.plane('glassClear', wx1 - wx0, wy1 - wy0, [(wx0 + wx1) / 2, (wy0 + wy1) / 2, dth - 0.01]);
   D.plane('glassClear', wx1 - wx0, wy1 - wy0, [(wx0 + wx1) / 2, (wy0 + wy1) / 2, 0.006]);
   for (const s of [-1, 1]) D.box('steelDark', (wx0 + wx1) / 2 - 0.1 * s - 0.003, wy0, 0.006, (wx0 + wx1) / 2 - 0.1 * s + 0.003, wy1, dth - 0.01, 0.001, 1);
   handle(D, [-Lw + 0.07, 0.8, dth], [-Lw + 0.07, 1.4, dth], 0.06, 0.014, 'chrome');

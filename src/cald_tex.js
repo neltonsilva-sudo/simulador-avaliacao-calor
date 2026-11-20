@@ -97,8 +97,8 @@ export function cladTextures() {
 let _steel = null;
 export function steelTextures() {
   if (_steel) return _steel;
-  const N = 1024, M = 1024, r = rng(71), col = new Float32Array(M);
-  for (const [cells, amp] of [[1024, 0.5], [512, 0.35], [256, 0.2], [128, 0.12]]) {
+  const N = 512, M = 512, r = rng(71), col = new Float32Array(M);
+  for (const [cells, amp] of [[512, 0.5], [256, 0.35], [128, 0.2], [64, 0.12]]) {
     const lat = Array.from({ length: cells }, () => r());
     for (let x = 0; x < M; x++) { const f = (x * cells) / M, i = Math.floor(f), t = f - i, s = t * t * (3 - 2 * t); col[x] += (lat[i % cells] * (1 - s) + lat[(i + 1) % cells] * s) * amp; }
   }
@@ -203,7 +203,7 @@ export function floorMacro() {
     x.restore();
   };
   // quadrados dos extintores (vermelho com borda amarela, NR-23/IT)
-  for (const [ex, ez] of [[30.75, -3.0], [55.3, 1.5], [45.6, 9.3]]) {
+  for (const [ex, ez] of [[30.75, -3.0], [55.3, 1.5], [45.6, 9.3], [54.95, -8.95], [36.0, 9.35]]) {
     x.fillStyle = 'rgba(178,30,26,0.95)'; x.fillRect(X(ex - 0.5), Z(ez - 0.5), S(1), S(1));
     x.strokeStyle = 'rgba(226,182,22,1)'; x.lineWidth = S(0.1); x.strokeRect(X(ex - 0.45), Z(ez - 0.45), S(0.9), S(0.9));
     rx.fillStyle = 'rgb(255,70,255)'; rx.fillRect(X(ex - 0.5), Z(ez - 0.5), S(1), S(1));
@@ -475,7 +475,7 @@ export function panelFront(label = 'CALDEIRA 1') {
 let _spun = null;
 export function spunTextures() {
   if (_spun) return _spun;
-  const N = 1024, r = rng(501), ring = new Float32Array(2048);
+  const N = 512, r = rng(501), ring = new Float32Array(2048);
   for (const [cells, amp] of [[520, 0.45], [180, 0.3], [40, 0.25]]) { const lat = Array.from({ length: cells + 1 }, () => r()); for (let i = 0; i < 2048; i++) { const f = (i * cells) / 2048, k = Math.floor(f), t = f - k, s2 = t * t * (3 - 2 * t); ring[i] += (lat[k] * (1 - s2) + lat[k + 1] * s2) * amp; } }
   const blot = fbm(N, N, 4, 4, 5, 503), h = new Float32Array(N * N);
   const [fc, fx] = cnv(N); fx.fillStyle = '#000'; fx.fillRect(0, 0, N, N); fx.lineCap = 'round';

@@ -82,7 +82,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   const P = {
     quality, ao: quality === 'low' ? 0 : 1.0, aoRadius: 0.28,
     fogDens: 0.0025, fogK: 0.18, fogCool: new THREE.Vector3(0.11, 0.11, 0.105), fogWarm: new THREE.Vector3(0.24, 0.16, 0.09), ovenGlow: 8.0,
-    ssr: quality === "low" ? 0 : 1.2, floorRefl: 2.0, warmPos: new THREE.Vector3(3.5, 1.8, -4.6), haze: quality === 'low' ? 0.6 : 1.0,
+    ssr: quality === "low" ? 0 : 1.2, floorRefl: 1.4, warmPos: new THREE.Vector3(3.5, 1.8, -4.6), haze: quality === 'low' ? 0.6 : 1.0,
     bloomThr: 1.1, bloom: 0.34, exposure: 0.8, ca: 0.15, vignette: 0.22, sat: 1.05, contrast: 0.22, room: 1,
     lift: new THREE.Vector3(0.0, 0.0, 0.0), gain: new THREE.Vector3(0.02, 0.008, -0.012),
     grain: 0.014, smaa: true, dofMax: 22, dofNear: 0.4, tonemap: qs.get('tmo') || 'hp',
@@ -240,10 +240,12 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   // fornos: luzes do palco (fileiras LED + chave com sombra). caldeiras: o grupo do agente CALDEIRAS traz as luzes dele; o palco
   // só reposiciona a chave com sombra (luz do dia vinda do alto/janelas) sobre o galpão e recaptura o IBL lá dentro.
   const ENVS = {
-    fornos: { bounds: HALL, probe: HALL.probe, rig: true, exposure: 0.8, envI: 0.3, fog: [0.0025, 0.18, [0.11, 0.11, 0.105], [0.24, 0.16, 0.09]], warm: [3.5, 1.8, -4.6],
+    fornos: { bounds: HALL, probe: HALL.probe, rig: true, exposure: 0.8, contrast: 0.22, envI: 0.3, fog: [0.0025, 0.18, [0.11, 0.11, 0.105], [0.24, 0.16, 0.09]], warm: [3.5, 1.8, -4.6],
       key: { pos: [1.8, 14, 5.5], target: [0.4, 0, -0.5], box: [-11, 11, 9, -9], near: 4, far: 26, i: 0.4, color: K4000 } },
-    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 0.95, envI: 0.75, fog: [0.004, 0.03, [0.42, 0.44, 0.46], [0.48, 0.46, 0.43]], warm: [40, 2.2, -3],
-      key: { pos: [49, 30, 14], target: [43, 0, 0], box: [-17, 17, 14, -14], near: 8, far: 60, i: 0.55, color: new THREE.Color(1.0, 0.98, 0.95) } },
+    // sol da manhã entrando pelas janelas altas da parede x0 (−x), ~37° de elevação: manchas de sol e sombras de pilares,
+    // caixilhos e tesouras no piso (o vidro não projeta sombra); névoa de vapor mais densa sob o telhado (fogK alto)
+    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 0.86, contrast: 0.3, envI: 0.6, fog: [0.0035, 0.2, [0.36, 0.38, 0.40], [0.62, 0.56, 0.47]], warm: [36, 5.5, 0],
+      key: { pos: [43 - 27, 21, 7], target: [43, 0, 0], box: [-22, 22, 20, -20], near: 5, far: 80, i: 3.2, color: new THREE.Color(1.0, 0.92, 0.8) } },
   };
   stage.env = 'fornos';
   function setEnv(id) {
@@ -252,7 +254,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     key.position.set(...E.key.pos); key.target.position.set(...E.key.target); key.intensity = E.key.i; key.color.copy(E.key.color);
     Object.assign(key.shadow.camera, { left: E.key.box[0], right: E.key.box[1], top: E.key.box[2], bottom: E.key.box[3], near: E.key.near, far: E.key.far });
     key.shadow.camera.updateProjectionMatrix(); key.target.updateMatrixWorld();
-    P.exposure = E.exposure; P.fogDens = E.fog[0]; P.fogK = E.fog[1]; P.fogCool.set(...E.fog[2]); P.fogWarm.set(...E.fog[3]); P.warmPos.set(...E.warm);
+    P.exposure = E.exposure; P.contrast = E.contrast ?? P.contrast; P.fogDens = E.fog[0]; P.fogK = E.fog[1]; P.fogCool.set(...E.fog[2]); P.fogWarm.set(...E.fog[3]); P.warmPos.set(...E.warm);
     cubeCam.position.set(...E.probe); envI = E.envI; envChain(0.4);
   }
 

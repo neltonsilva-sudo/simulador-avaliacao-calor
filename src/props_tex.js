@@ -195,7 +195,7 @@ export function makeThermoCanvas() {
 
 /** quadro de avisos: cortiça + folhas fixadas com tachinhas (cronograma de produção etc.) */
 export const boardTex = () => once('board', () => {
-  const W = 1536, H = 1024, R = rng(404); const [c, x] = cv(W, H);
+  const W = 1536, H = 1024, R = rng(404); const [c, x] = cv(1024, 683); x.scale(1024 / W, 683 / H); // desenho em 1536×1024, textura 1024 (orçamento de GPU)
   x.fillStyle = '#b98c58'; x.fillRect(0, 0, W, H);
   for (let i = 0; i < 9000; i++) { x.fillStyle = `rgba(${R() < 0.5 ? '90,58,28' : '220,180,130'},${0.15 + R() * 0.3})`; x.fillRect(R() * W, R() * H, 1 + R() * 3, 1 + R() * 3); }
   const sheet = (px, py, w, h, rot, draw) => {
@@ -241,7 +241,7 @@ export const boardTex = () => once('board', () => {
   sheet(120, 650, 330, 260, 0.06, () => { x.fillStyle = '#f2df6b'; x.fillRect(0, 0, 330, 260); x.fillStyle = '#1d2e7a'; x.font = `italic 600 30px ${FONT}`; ['Trocar borracha da', 'porta do turbo 1!', '— manutenção 3ª'].forEach((t, i) => x.fillText(t, 22, 70 + i * 50)); });
   sheet(500, 660, 320, 300, -0.04, (w) => { x.fillStyle = '#c4161c'; x.fillRect(0, 0, w, 64); x.fillStyle = '#fff'; x.font = `700 28px ${FONT}`; x.textAlign = 'center'; x.fillText('HIDRATE-SE', w / 2, 44);
     x.fillStyle = '#222'; x.font = `600 22px ${FONT}`; ['Beba água a cada', '15–20 minutos', 'mesmo sem sede', '(medida de controle)'].forEach((t, i) => x.fillText(t, w / 2, 120 + i * 40)); x.textAlign = 'left'; });
-  noise(x, W, 6, R);
+  x.setTransform(1, 0, 0, 1, 0, 0); noise(x, 1024, 6, R);
   return tex(c);
 });
 
@@ -264,5 +264,24 @@ export const smudgeTex = () => once('smudge', () => {
   for (let i = 0; i < 4; i++) { const px = 70 + i * 34 + R() * 8, py = 90 + Math.abs(i - 1.5) * 18; const g = x.createRadialGradient(px, py, 2, px, py, 26); g.addColorStop(0, 'rgba(250,248,242,0.7)'); g.addColorStop(1, 'rgba(250,248,242,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(px, py, 14, 28, 0.2 - i * 0.12, 0, 7); x.fill(); }
   const g = x.createRadialGradient(130, 170, 10, 130, 170, 70); g.addColorStop(0, 'rgba(250,248,242,0.4)'); g.addColorStop(1, 'rgba(250,248,242,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(130, 170, 60, 44, 0, 0, 7); x.fill();
   for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(250,248,242,${R() * 0.4})`; x.fillRect(40 + R() * 180, 60 + R() * 160, 1.5, 1.5); }
+  return tex(c);
+});
+
+/** painel isotérmico (câmara fria): branco com frisos verticais, juntas e encardido junto ao piso */
+export const panelTex = () => once('panel', () => {
+  const W = 512, H = 1024, R = rng(55); const [c, x] = cv(W, H);
+  x.fillStyle = '#eceeec'; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < W; i += 32) { x.fillStyle = 'rgba(0,0,0,0.07)'; x.fillRect(i, 0, 2, H); x.fillStyle = 'rgba(255,255,255,0.5)'; x.fillRect(i + 2, 0, 2, H); }
+  x.fillStyle = 'rgba(60,60,60,0.35)'; x.fillRect(0, 0, 3, H); x.fillRect(W - 3, 0, 3, H);
+  const g = x.createLinearGradient(0, H, 0, H * 0.75); g.addColorStop(0, 'rgba(90,80,60,0.28)'); g.addColorStop(1, 'rgba(90,80,60,0)'); x.fillStyle = g; x.fillRect(0, H * 0.75, W, H * 0.25);
+  for (let i = 0; i < 40; i++) { x.fillStyle = `rgba(${R() < 0.5 ? '120,110,90' : '255,255,255'},${0.03 + R() * 0.05})`; x.beginPath(); x.ellipse(R() * W, R() * H, 6 + R() * 40, 10 + R() * 60, 0, 0, 7); x.fill(); }
+  noise(x, W, 6, R);
+  return tex(c, { rep: true });
+});
+/** display do controlador da câmara fria (LED vermelho) */
+export const coldLedTex = () => once('coldled', () => {
+  const [c, x] = cv(256, 128); x.fillStyle = '#100404'; x.fillRect(0, 0, 256, 128);
+  x.fillStyle = '#ff3a26'; x.font = `700 74px "Roboto Mono", monospace`; x.textAlign = 'center'; x.fillText('2.0', 128, 92);
+  x.fillStyle = '#4cff6a'; x.beginPath(); x.arc(30, 26, 7, 0, 7); x.fill();
   return tex(c);
 });

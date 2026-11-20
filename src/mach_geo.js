@@ -245,7 +245,7 @@ export function makeMaterials(envMap) {
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
     }),
     glassDark: new THREE.MeshPhysicalMaterial({
-      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.36, envMap, envMapIntensity: 0.3, roughnessMap: T.glassGrime(), depthWrite: false,
+      color: 0x000000, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.26, envMap, envMapIntensity: 0.3, roughnessMap: T.glassGrime(), depthWrite: false,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation,
     }),
     // vidro do armário de fermentação (vermelho)

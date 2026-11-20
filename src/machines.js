@@ -45,7 +45,7 @@ export function buildMachines(stage, app) {
     cav2: cav(21, [[0.35, 0.1, 1.4], [0.65, 0.1, 1.4]], 5.0, [1, 0.5, 0.06]), cav2t: cav(22, [[0.35, 0.8, 1.6], [0.65, 0.8, 1.6]], 5.2, [1, 0.52, 0.07]), cav2f: cav(23, [], 3.6, [1, 0.48, 0.05]),
     cav3: cav(31, [[0.5, 0.05, 0.5]], 3.2), cav3t: cav(32, [[0.5, 0.85, 1.0]], 3.4), cav3f: cav(33, [], 2.0),
     cav4: cav(41, [[0.5, 0.05, 0.5]], 3.2), cav4t: cav(42, [[0.5, 0.85, 1.0]], 3.4), cav4f: cav(43, [], 2.0),
-    cavR: cav(51, [[0.5, 0.06, 0.5]], 3.0, [1, 0.55, 0.18]), cavRt: cav(52, [[0.5, 0.5, 1]], 3.2, [1, 0.55, 0.18]), cavRf: cav(53, [], 1.8, [1, 0.52, 0.16]),
+    cavR: cav(51, [[0.5, 0.06, 0.8]], 5.0, [1, 0.55, 0.16]), cavRt: cav(52, [[0.5, 0.5, 1.2]], 5.2, [1, 0.55, 0.16]), cavRf: cav(53, [], 3.0, [1, 0.5, 0.14]),
     stone: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.42, 0.11, 0.012) }),
   });
   M.stone.userData.noAO = true;
@@ -53,8 +53,8 @@ export function buildMachines(stage, app) {
     m.userData.noShadow = true; m.userData.order = 3; return m; };
   M.fxTurbo = fx(T.glassFxTexture(5, { bands: 1, haze: 0.5 }), 0.22);
   M.fxVit = fx(T.glassFxTexture(7, { bands: 1, dots: 2, dotRows: 1 }), 0.4);
-  M.fxDeck = fx(T.glassFxTexture(9, { bands: 1, dots: 7, dotRows: 2 }), 0.7);
-  M.fxDeck2 = fx(T.glassFxTexture(13, { bands: 2, dots: 12, dotRows: 2 }), 0.6);
+  M.fxDeck = fx(T.glassFxTexture(9, { bands: 1, dots: 7, dotRows: 1, haze: 0.5 }), 0.35);
+  M.fxDeck2 = fx(T.glassFxTexture(13, { bands: 1, dots: 12, dotRows: 1, haze: 0.5 }), 0.3);
   const cavKeys = { forno1: ['cav1', 'cav1t', 'cav1f'], forno2: ['cav2', 'cav2t', 'cav2f'], lastro: ['cav3', 'cav3t', 'cav3f'], vertical: ['cav4', 'cav4t', 'cav4f', 'stone'], rotativo: ['cavR', 'cavRt', 'cavRf'] };
   cavKeys.lastro.push('stone');
 
@@ -109,6 +109,30 @@ export function buildMachines(stage, app) {
     L.parent.add(im);
   }
 
+  // ── brilho por forno: clona (por forno) os materiais "acesos" (cavidade, lastro, lâmpadas, pães internos, halos) e guarda a base;
+  // o update escala tudo pela temperatura da câmara (app.field.pv) e apaga com o forno desligado (app.field.on[id] === false).
+  const glowSet = new Set([...Object.values(cavKeys).flat().map((k) => M[k]), M.lamp, M.breadIn, M.breadInPale]);
+  const heatMats = {};
+  for (const [id, grp] of Object.entries(ovenGroups)) {
+    const list = (heatMats[id] = []), cloned = new Map();
+    grp.traverse((ob) => {
+      const m = ob.material; if (!m) return;
+      if (ob.isSprite) { list.push({ m, kind: 'col', base: m.color.clone() }); return; }
+      if (!glowSet.has(m)) return;
+      if (!cloned.has(m)) {
+        const c = m.clone(); c.onBeforeCompile = m.onBeforeCompile; c.customProgramCacheKey = m.customProgramCacheKey; c.userData = { ...m.userData };
+        cloned.set(m, c); list.push(m.emissiveIntensity != null && (m === M.breadIn || m === M.breadInPale) ? { m: c, kind: 'emi', base: m.emissiveIntensity } : { m: c, kind: 'col', base: m.color.clone() });
+      }
+      ob.material = cloned.get(m);
+    });
+  }
+  const heatCur = Object.fromEntries(OVENS.map((o) => [o.id, 1]));
+  const heatOf = (o) => {
+    const F = app?.field; if (!F?.pv) return state[o.id].on ? 1 : 0.04;
+    if (F.on?.[o.id] === false && (F.pv[o.id] ?? 0) < 60) return 0.03;
+    const x = Math.max(0, Math.min(1.15, ((F.pv[o.id] ?? o.setpoint) - 45) / (o.setpoint - 45)));
+    return Math.max(0.03, Math.pow(x, 1.6)) * (F.on?.[o.id] === false ? 0.55 : 1);   // desligado: lâmpadas apagadas, só o resto incandescente
+  };
   // ── luzes: interior do forno 1 (sempre), vazamento do forno 1 (porta aberta) e uma luz itinerante para os demais ──
   const inner = new THREE.PointLight(0xffc070, 1.6, 1.3, 2); inner.position.copy(ctx.lightAnchor.forno1 || new THREE.Vector3(7.1, 1.4, -5.3)); root.add(inner);
   const o1 = OVENS.find((o) => o.id === 'forno1'), d1 = o1.doors[0];
@@ -140,7 +164,6 @@ export function buildMachines(stage, app) {
     doorOpen: (id) => state[id]?.cur ?? 0,
     setOven(id, on) {
       if (!state[id]) return; state[id].on = !!on;
-      const k = 0.08; for (const key of cavKeys[id] || []) { const m = M[key]; if (m?.userData.base != null) m.color.setScalar(on ? m.userData.base : m.userData.base * k); }
     },
     update(dt, t) {
       dt = Math.min(dt, 0.1);
@@ -160,10 +183,15 @@ export function buildMachines(stage, app) {
       }
       // carrinho do rotativo gira (para com a porta aberta)
       for (const sp of ctx.spin) { const s = state[sp.id]; sp.obj.rotation.y += dt * sp.w * Math.max(0, 1 - s.cur * 4) * (s.on ? 1 : 0); }
+      // brilho proporcional à temperatura da câmara (suavizado)
+      for (const o of OVENS) {
+        const h = (heatCur[o.id] += (heatOf(o) - heatCur[o.id]) * Math.min(1, dt * 2));
+        for (const e of heatMats[o.id] || []) { if (e.kind === 'emi') e.m.emissiveIntensity = e.base * h; else e.m.color.copy(e.base).multiplyScalar(h); }
+      }
       // luzes
-      const f1 = state.forno1;
-      inner.intensity = f1.on ? 1.6 + f1.cur * 0.4 : 0.05;
-      spill1.intensity = f1.on ? 0.25 + f1.cur * 5 * (0.94 + 0.06 * Math.sin(t * 13) * Math.sin(t * 7.3)) : 0;
+      const f1 = state.forno1, h1 = heatCur.forno1;
+      inner.intensity = (1.6 + f1.cur * 0.4) * h1;
+      spill1.intensity = (0.25 + f1.cur * 5 * (0.94 + 0.06 * Math.sin(t * 13) * Math.sin(t * 7.3))) * Math.max(0.15, h1);
       let best = null, bv = 0; for (const o of OVENS) if (o.id !== 'forno1' && state[o.id].cur > bv) { bv = state[o.id].cur; best = o; }
       if (best && bv > 0.02) { const d = best.doors[Math.floor(best.doors.length / 2)]; spill2.position.set(best.x + d.cx, d.y0 + d.h * 0.6, HALL.z0 + best.d + 0.25); spill2.intensity = 0.6 + bv * 5; }
       else { spill2.position.set(glowBase.x, 1.4, HALL.z0 + glowBase.d + 0.3); spill2.intensity = 0.6; }
