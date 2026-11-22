@@ -59,17 +59,17 @@ export function createSteam(ctx, emitters) {
   const E = [];
   for (const [id, e] of Object.entries(emitters)) {
     const cfg = {
-      purgador: { rate: 80, life: [5, 8.5], v0: 2.6, spread: 0.13, s0: 0.03, grow: 0.45, a0: 0.35, drag: 1.25, buoy: 0.7, hot: 1 },
-      respiro: { rate: 60, life: [8, 12], v0: 2.0, spread: 0.12, s0: 0.1, grow: 0.6, a0: 0.45, drag: 0.85, buoy: 0.6, hot: 0.8 },
-      flash: { rate: 50, life: [7, 11], v0: 1.7, spread: 0.12, s0: 0.08, grow: 0.6, a0: 0.45, drag: 0.85, buoy: 0.6, hot: 0.8 },
+      purgador: { rate: 55, life: [5, 8.5], v0: 2.6, spread: 0.13, s0: 0.03, grow: 0.4, a0: 0.24, drag: 1.25, buoy: 0.7, hot: 1 },
+      respiro: { rate: 38, life: [6, 9], v0: 2.0, spread: 0.12, s0: 0.1, grow: 0.5, a0: 0.3, drag: 0.85, buoy: 0.6, hot: 0.8 },
+      flash: { rate: 32, life: [5.5, 8.5], v0: 1.7, spread: 0.12, s0: 0.08, grow: 0.5, a0: 0.3, drag: 0.85, buoy: 0.6, hot: 0.8 },
       dreno: { rate: 5, life: [1.8, 3.2], v0: 0.35, spread: 0.6, s0: 0.05, grow: 0.16, a0: 0.18, drag: 1.2, buoy: 0.35, hot: 0.4 },
     }[id]; if (!cfg) continue;
     E.push({ id, pos: e.pos.clone(), dir: e.dir.clone().normalize(), acc: 0, on: 1, ...cfg });
   }
   // névoa de vapor acumulada sob o telhado (grandes tufos quase estáticos)
   const HZ = [];
-  for (const e of E.filter((q) => q.id !== 'dreno')) for (let k = 0; k < 14; k++) {
-    HZ.push({ p: new THREE.Vector3(e.pos.x + (R() - 0.5) * 7, CEIL - 0.3 - R() * 1.6, e.pos.z + (R() - 0.2) * 5), s: 3.5 + R() * 3.5, a: 0.06 + R() * 0.07, rot: R() * 6, tile: (R() * 4) | 0, ph: R() * 6, w: 0.05 + R() * 0.08 });
+  for (const e of E.filter((q) => q.id !== 'dreno')) for (let k = 0; k < 8; k++) {
+    HZ.push({ p: new THREE.Vector3(e.pos.x + (R() - 0.5) * 7, CEIL - 0.3 - R() * 1.6, e.pos.z + (R() - 0.2) * 5), s: 3.5 + R() * 3.5, a: 0.035 + R() * 0.04, rot: R() * 6, tile: (R() * 4) | 0, ph: R() * 6, w: 0.05 + R() * 0.08 });
   }
   const tmp = new THREE.Vector3();
   function noise(x, y, z, t) { return Math.sin(x * 1.7 + t * 0.9 + Math.sin(z * 1.3 + t * 0.5)) * Math.cos(y * 1.1 - t * 0.7 + z * 0.4); }

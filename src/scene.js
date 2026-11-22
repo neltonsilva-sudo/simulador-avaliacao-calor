@@ -245,7 +245,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
       key: { pos: [1.8, 14, 5.5], target: [0.4, 0, -0.5], box: [-11, 11, 9, -9], near: 4, far: 26, i: 0.4, color: K4000 } },
     // sol da manhã entrando pelas janelas altas da parede x0 (−x), ~37° de elevação: manchas de sol e sombras de pilares,
     // caixilhos e tesouras no piso (o vidro não projeta sombra); névoa de vapor mais densa sob o telhado (fogK alto)
-    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 0.86, contrast: 0.3, envI: 0.6, fog: [0.0035, 0.2, [0.36, 0.38, 0.40], [0.62, 0.56, 0.47]], warm: [36, 5.5, 0],
+    caldeiras: { bounds: HALL2, probe: HALL2.probe, rig: false, exposure: 0.86, contrast: 0.3, envI: 0.6, fog: [0.0025, 0.12, [0.36, 0.38, 0.40], [0.62, 0.56, 0.47]], warm: [36, 5.5, 0],
       key: { pos: [43 - 27, 21, 7], target: [43, 0, 0], box: [-22, 22, 20, -20], near: 5, far: 80, i: 3.2, color: new THREE.Color(1.0, 0.92, 0.8) } },
   };
   stage.env = 'fornos';
