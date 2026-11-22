@@ -395,7 +395,10 @@ export function buildMeter(stage, fw, app) {
     (OL[hl] || []).forEach((o) => (o.visible = true));
     for (const k in keyHalo) { const on = hl === k || hl === 'keys' || hl === 'all'; keyHalo[k].visible = on; if (!on) { keys[k].material.emissive.setHex(0x0b3a6e); keys[k].material.emissiveIntensity = 0.12; } }
   }
-  function pressAnim(key) { if (key in press) pulses[key] = 0.22; }
+  let flashKey = null, flashT = 0;
+  /** acende a tecla apertada por ~0,9 s (além do destaque do passo) */
+  function flash(key, ms = 900) { const k = String(key).split('+')[0]; if (keys[k]) { flashKey = k; flashT = ms / 1000; } }
+  function pressAnim(key) { if (key in press) pulses[key] = 0.22; flash(key); }
 
   // ── interação: clique/segure nas teclas do aparelho 3D → fw.press(key, holdMs). ⏻ segurada 2 s dispara na hora. ──
   const cv = stage.canvas, ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); const keyMeshes = Object.values(keys);
@@ -492,8 +495,18 @@ export function buildMeter(stage, fw, app) {
     if (Math.abs(nw - wet) > 1e-4) { wet = nw; applyWick(); }
     if (hl) { hlT += dt; const a = 0.5 + 0.45 * Math.sin(hlT * 5.5); (OL[hl] || []).forEach((o) => (o.material.opacity = a));
       const p = 0.5 + 0.5 * Math.sin(hlT * 4.2);
-      for (const k in keyHalo) if (keyHalo[k].visible) { keyHalo[k].material.opacity = 0.55 + 0.45 * p; keyHalo[k].scale.setScalar(1 + 0.06 * p);
-        keys[k].material.emissive.setRGB(0.55, 0.38, 0.08); keys[k].material.emissiveIntensity = 0.35 + 0.45 * p; } }
+ }
+    // halos das teclas: tecla destacada pelo passo (hl) e/ou tecla apertada agora (flash), em todos os passos
+    if (flashKey) { flashT -= dt; if (flashT <= 0) flashKey = null; }
+    for (const k in keyHalo) {
+      const base = !flashKey && (hl === k || hl === 'keys' || hl === 'all'), fl = flashKey === k, on = base || fl, h = keyHalo[k], km = keys[k].material;
+      h.visible = on;
+      if (!on) { if (km.emissiveIntensity !== 0.12) { km.emissive.setHex(0x0b3a6e); km.emissiveIntensity = 0.12; } continue; }
+      const p = fl ? 1 : 0.5 + 0.5 * Math.sin(hlT * 4.2);
+      h.material.opacity = fl ? 1 : 0.55 + 0.45 * p; h.scale.setScalar(fl ? 1.1 : 1 + 0.06 * p);
+      km.emissive.setRGB(0.55, 0.38, 0.08); km.emissiveIntensity = fl ? 0.9 : 0.35 + 0.45 * p;
+    }
+    if (!hl && flashKey) hlT += dt;
   }
 
   setHeight(app?.state?.meterHeight ?? 1.3); applyWater(); applyWick(); update(0);
