@@ -77,13 +77,23 @@ const app = {
       // passagem por cima dos telhados do lado de destino e novo esmaecimento para dentro — sem atravessar paredes.
       const st = app.stage, rx = app.street?.roadX ?? 18.9, toCald = id === 'caldeiras', s0 = toCald ? 1 : -1, dest = toCald ? 'c_overview' : 'overview';
       if (flight) {
+        // portas de entrada na rua (fachadas do casario, layout_rua.js): padaria a oeste (x 14,1, olha +x), casa de
+        // caldeiras a leste (x 23,7, olha −x), ambas em z ≈ 0, com o letreiro acima da porta.
+        const DOOR = { fornos: { x: 14.1, s: 1 }, caldeiras: { x: 23.7, s: -1 } }, from = DOOR[toCald ? 'fornos' : 'caldeiras'], to = DOOR[id];
+        const front = (d, dist, y = 1.75, dz = 0) => [d.x + d.s * dist, y, dz];
         st.freeCam = true; st.setEnv?.('rua');
-        await st.flyTo({ pos: [rx - s0 * 7, 15, -26], target: [rx, 1.5, 6], fov: 55 }, 0);
+        // 1) saindo pela porta do ambiente de origem: letreiro sobre a porta em quadro
+        await st.flyTo({ pos: front(from, 3.2, 1.8, -2.2), target: [from.x, 2.9, 0], fov: 50 }, 0);
         await nextFrames(2); await fadeTo(0, 0.45);
-        await st.flyTo({ pos: [rx - s0 * 0.8, 3.2, -12], target: [rx, 5.5, 62], fov: 55 }, 1.6); // desce na rua, igreja ao fundo
-        await st.flyTo({ pos: [rx + s0 * 1.5, 4.5, 4], target: [rx + s0 * 4, 4.2, 30], fov: 55 }, 1.3); // segue pela rua
-        await st.flyTo({ pos: [rx + s0 * 5, 15.5, 2], target: [rx + s0 * 16, 2, 0], fov: 55 }, 1.2); // sobe acima dos telhados
-        await fadeTo(1, 0.35);
+        await st.flyTo({ pos: front(from, 4.0, 1.9, -1.6), target: [from.x, 2.8, 0.3], fov: 50 }, 1.1);
+        // 2) a rua: olha ladeira acima, para a igreja
+        await st.flyTo({ pos: [rx - s0 * 0.6, 2.1, -3], target: [rx, 5, 62], fov: 55 }, 1.5);
+        // 3) vira para a fachada de destino: porta e letreiro em quadro
+        await st.flyTo({ pos: front(to, 5.2, 1.9, -1.2), target: [to.x, 2.9, 0], fov: 50 }, 1.5);
+        await new Promise((r) => setTimeout(r, 700));
+        // 4) entra pela porta
+        await st.flyTo({ pos: front(to, 0.9, 1.75, 0), target: [to.x - to.s * 3, 1.7, 0], fov: 55 }, 1.3);
+        await fadeTo(1, 0.3);
         st.freeCam = false; st.setEnv?.(id); await st.setView?.(dest, { animate: false });
         await nextFrames(2); await fadeTo(0, 0.5);
       } else {
