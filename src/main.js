@@ -271,6 +271,22 @@ function getInput() {
   const o = new THREE.Object3D(); o.name = 'presentDevice'; const PD = ENVS[state.env].PRESENT.device; o.position.copy(V(PD.pos)); o.rotation.y = PD.rotY || 0; stage.scene.add(o); anchors.presentDevice = o;
   app.anchors = anchors;
 
+  // Legenda da demonstração (.ui-caption) cobre a parte de baixo da tela: nas vistas de perto do aparelho, desloca o
+  // enquadramento para cima (camera.setViewOffset) para o medidor ficar inteiro na área livre.
+  let capShift = 0;
+  stage.onFrame((dt) => {
+    const cam = stage.camera, cv = stage.canvas, W = cv.clientWidth || innerWidth, H = cv.clientHeight || innerHeight;
+    const cap = document.querySelector('.ui-caption');
+    let want = 0;
+    if (cap && cap.offsetParent && /present|calib|mesa/.test(stage.view || '')) {
+      const r = cap.getBoundingClientRect(); const free = r.top; // área livre acima da legenda
+      if (free < H * 0.92) want = Math.min(H * 0.32, (H - free) * 0.55);
+    }
+    capShift += (want - capShift) * Math.min(1, dt * 6);
+    const z = 1 - 0.75 * capShift / H; // afasta um pouco para caber o globo inteiro abaixo da barra superior
+    if (Math.abs(cam.zoom - z) > 1e-4) cam.zoom = z;
+    if (capShift > 0.5) cam.setViewOffset(W, H, 0, capShift * 0.7, W, H); else { if (cam.view?.enabled) cam.clearViewOffset(); else if (cam.zoom !== 1) { cam.zoom = 1; cam.updateProjectionMatrix(); } }
+  });
   stage.onFrame((dt, t) => {
     stepSimulation(dt);
     app.machines?.update?.(dt, t); app.worker?.update?.(dt, t); app.fw?.update?.(dt);
