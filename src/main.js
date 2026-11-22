@@ -205,7 +205,7 @@ function flyRig(rig, pos, rotY, duration) {
 }
 
 // ─── simulação (passos de 1 s simulado) ───
-let simAcc = 0, lastMinute = -1, lastSeg = null;
+let simAcc = 0, lastMinute = -1, lastSeg = null, pinned = null;
 function stepSimulation(dt) {
   const fw = app.fw;
   const nSec = state.running ? dt * state.speed : dt;
@@ -215,9 +215,15 @@ function stepSimulation(dt) {
   for (let i = 0; i < n; i++) {
     state.clock += 1;
     field.stepOvens(1);
+    // durante o posicionamento/medição (aula ou atividade) a trabalhadora fica no posto onde está o tripé, fazendo a
+    // atividade dele (sentada no descanso/controle), em vez de seguir o ciclo em outro lugar
+    const pin = ['posicionar', 'medicao', 'atividade'].includes(state.phase) && STATIONS[state.station] ? state.station : null;
+    if (pin && pin !== pinned) { pinned = pin; const sit = Object.values(app.cycle().SITUACOES).find((x) => x.station === pin);
+      const act = Object.values(app.cycle().ATIVIDADES).find((a) => a.sit === sit?.id)?.id; app.worker?.setStation?.(pin, { act }); lastSeg = null; }
+    else if (!pin && pinned) { pinned = null; lastSeg = null; }
     if (state.running) {
       const seg = app.cycle().segmentAt(state.clock);
-      if (state.followCycle && (!lastSeg || seg.act !== lastSeg.act || seg.station !== lastSeg.station)) {
+      if (state.followCycle && !pinned && (!lastSeg || seg.act !== lastSeg.act || seg.station !== lastSeg.station)) {
         app.worker?.setStation?.(seg.station, { act: seg.act }); lastSeg = seg; app.emit('segment', seg);
       }
       applyDoor();

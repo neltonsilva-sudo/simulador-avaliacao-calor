@@ -823,7 +823,11 @@ export async function buildWorker(stage, app) {
   }
 
   function update(dt, t) {
-    dt = Math.min(dt || 0, 0.1); L.actT += dt;
+    dt = Math.min(dt || 0, 0.1);
+    // com a jornada acelerada (app.state.speed s simulados por s real) cada situação dura poucos segundos na tela: os
+    // deslocamentos e gestos acompanham (até 5×), senão ela não chega ao forno antes de a porta fechar
+    const spd = app?.state?.running ? Math.min(5, Math.max(1, (app.state.speed || 1) / 15)) : 1;
+    dt *= spd; L.actT += dt;
     for (const [b, qr] of rest) b.quaternion.copy(qr);
     for (const b of lidRest) b.position.copy(restPos.get(b));
     locomotion(dt); planFeet(dt);
