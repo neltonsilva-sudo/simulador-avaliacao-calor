@@ -690,6 +690,7 @@ export async function buildWorker(stage, app) {
     const t1 = L.path.find((q) => q.distanceTo(L.pos) > 0.08); if (t1) { const hd = Math.atan2(t1.x - L.pos.x, t1.y - L.pos.y); if (Math.abs(wrap(hd - L.head)) > 0.6) { L.turnTo = L.head + wrap(hd - L.head); L.mode = 'turn'; L.queue.unshift(() => { L.mode = 'walk'; }); } } };
   const navWalk = (tg) => () => { const nav = navFor(envOf(L.st)); const p = nav?.plan(L.pos.clone(), new THREE.Vector2(tg[0], tg[1]), tripodObs()); walk(p || [[L.pos.x, L.pos.y], tg])(); };
   const turn = (r) => () => { L.turnTo = r; L.mode = 'turn'; };
+  const pause = (sec) => () => { L.pauseT = sec; L.mode = L.sitW > 0.5 ? 'seatedPause' : 'pause'; };
   const sitDown = (id) => () => { const s = ST[id]; L.from = L.pos.clone(); L.to = new THREE.Vector2(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.hipSeat = SEAT[id] + 0.09; L.sitT = 0; L.mode = 'sitdown'; };
   // levanta para a frente do PRÓPRIO assento (estação capturada ao enfileirar; antes usava a estação de destino e ela
   // deslizava sentada até o outro posto)
@@ -725,7 +726,7 @@ export async function buildWorker(stage, app) {
     }
     if (id === L.st && L.mode !== 'walk' && !L.patrol) { startPatrol(); return; }
     const q = [];
-    if (L.mode === 'seated' || L.mode === 'sitdown') q.push(standUp(L.st));
+    if (L.mode === 'seated' || L.mode === 'sitdown') q.push(pause(0.8), standUp(L.st), pause(0.5)); // termina o que fazia, levanta devagar, firma-se de pé
     const from = L.mode === 'walk' ? null : L.st, cur = () => L.pos.clone();
     q.push(() => walk(route(from, id, cur()))(), turn(s.workerRotY));
     if (s.seated) q.push(sitDown(id));
@@ -741,12 +742,14 @@ export async function buildWorker(stage, app) {
       let rem = dist; for (let k = L.pi + 1; k < L.path.length; k++) rem += L.path[k].distanceTo(L.path[k - 1]); L.rem = rem;
       const dh = wrap(Math.atan2(d.x, d.y) - L.head); L.head += Math.sign(dh) * Math.min(Math.abs(dh), 4.2 * dt);
       const vmax = Math.min(1.1, Math.sqrt(2 * 1.4 * rem) + 0.12) * (Math.abs(dh) > 1.0 ? 0.35 : 1);
-      L.v += Math.sign(vmax - L.v) * Math.min(Math.abs(vmax - L.v), 2.0 * dt);
+      L.v += Math.sign(vmax - L.v) * Math.min(Math.abs(vmax - L.v), (L.v < vmax ? 1.1 : 2.0) * dt); // arranca devagar
       const step = Math.min(L.v * dt, dist); L.pos.addScaledVector(d.normalize(), step); return step;
     }
     if (L.mode === 'turn') { const dh = wrap(L.turnTo - L.head); const r = Math.sign(dh) * Math.min(Math.abs(dh), 2.4 * dt); L.head += r; if (Math.abs(dh) < 0.01) { L.head = L.turnTo; next(); } return Math.abs(r) * 0.35; }
+    if (L.mode === 'pause' || L.mode === 'seatedPause') { L.pauseT -= dt; if (L.pauseT <= 0) next(); return 0; }
     if (L.mode === 'sitdown' || L.mode === 'standup') {
-      L.sitT = Math.min(1, L.sitT + dt / 1.4); const k = sst(L.sitT); L.pos.copy(L.from).lerp(L.to, sst(L.sitT * 1.3 - (L.mode === 'standup' ? 0.3 : 0)));
+      // levantar/sentar sem pressa
+      L.sitT = Math.min(1, L.sitT + dt / (L.mode === 'standup' ? 2.4 : 2.0)); const k = sst(L.sitT); L.pos.copy(L.from).lerp(L.to, sst(L.sitT * 1.3 - (L.mode === 'standup' ? 0.3 : 0)));
       L.sitW = L.mode === 'sitdown' ? k : 1 - k; if (L.sitT >= 1) next(); return 0;
     }
     if (L.mode === 'stand' && L.patrol) { L.wait -= dt; if (L.wait < 0) { L.pIdx = (L.pIdx + 1) % L.patrol.length; const tg = L.patrol[L.pIdx];
@@ -787,7 +790,7 @@ export async function buildWorker(stage, app) {
         if (!roll) { P.hL = BP(0.12, 0.95 + 0.02 * Math.max(0, s), 0.42 + 0.07 * s); P.hR = BP(-0.12, 0.95 + 0.02 * Math.max(0, -s), 0.42 - 0.07 * s); }
         else { const o = 0.06 + 0.1 * (0.5 + 0.5 * Math.sin(T * 3.4)); P.hL = BP(o, 0.94, 0.44 + 0.03 * Math.sin(T * 6.8)); P.hR = BP(-o, 0.94, 0.44 + 0.03 * Math.sin(T * 6.8)); }
         P.lean = 0.3 + 0.04 * s; P.look = BP(0, 0.9, 0.45); P.dough = true; P.fdirL = P.fdirR = 'down'; P.gripL = P.gripR = 0.25;
-      } else if (a === 'A3' && L.mode === 'seated') {
+      } else if (a === 'A3' && (L.mode === 'seated' || L.mode === 'seatedPause')) {
         P.cup = true; P.gripR = 0.75; P.lean = -0.04;
         const u = (T % 11) / 11, k = u > 0.55 && u < 0.85 ? Math.sin(((u - 0.55) / 0.3) * Math.PI) : 0;
         const mouth = wpos(B.Head).addScaledVector(W(0, 0, 1), 0.1).addScaledVector(Y, -0.06);
@@ -806,7 +809,7 @@ export async function buildWorker(stage, app) {
         S.rot += (u < 0.75 ? 1 : 0) * 0.0; valve.userData.wheel.rotation.z = -(Math.floor(T / per) * 0.7 + (u < 0.75 ? sst(u / 0.75) * 0.7 : 0.7));
         const ang = (b) => V3(c.x + Math.cos(b) * 0.16, c.y + Math.sin(b) * 0.16, c.z + 0.025);
         P.hL = ang(Math.PI - 0.55 - rot); P.hR = ang(0.55 - rot); P.gripL = P.gripR = 0.95; P.fdirL = P.fdirR = c.clone(); P.lean = 0.1; P.look = c.clone();
-      } else if (a === 'A3' && L.mode === 'seated') {
+      } else if (a === 'A3' && (L.mode === 'seated' || L.mode === 'seatedPause')) {
         P.book = true; P.pen = true; P.lean = 0.32;
         const bk = BP(0.03, SEAT.controle + 0.27, 0.5), wr = (T % 6) < 4.5;
         P.hR = bk.clone().add(BP(-0.07 + 0.08 * ((T * 0.25) % 1) - L.pos.x * 0, 0, 0).sub(BP(0, 0, 0))).add(V3(0, 0.03 + (wr ? 0.004 * Math.sin(T * 23) : 0.03), 0));
@@ -909,7 +912,7 @@ export async function buildWorker(stage, app) {
       const handDown = elbowDown.clone().add(W(sx * 0.06, -1, 0.22 + swing * 1.4 + 0.15 * sw).normalize().multiplyScalar(0.25));
       const target = S[wk] > 0.01 && S[key] ? handDown.clone().lerp(S[key], S[wk]) : handDown;
       if (sw > 0.5 && !tgt) target.copy(BP(sx * 0.15, L.hipSeat + 0.1, 0.25));
-      ik(sd, target, (L.mode === 'seated' && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
+      ik(sd, target, ((L.mode === 'seated' || L.mode === 'seatedPause') && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
       if (fdir === 'point' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], PANEL, 0.85);
       if (fdir === 'down' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], wpos(B[sd + '_Hand']).add(W(0, -0.55, 1).normalize()), 0.7);
       if (fdir === 'in' && S[wk] > 0.5 && S.hL && S.hR) aim(B[sd + '_Hand'], B[sd + '_Finger2'], S.hL.clone().add(S.hR).multiplyScalar(0.5).add(V3(0, -0.02, 0)).addScaledVector(fwd, 0.06), 0.55);
