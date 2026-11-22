@@ -219,6 +219,20 @@ export function buildMeter(stage, fw, app) {
     m.position.set(KEY_X, KEY_Y[k], PANEL_Z); m.userData.key = k; m.name = 'tecla_' + k; keys[k] = m; keyRest[k] = PANEL_Z;
     keyOutline[k] = outlineOf(m, 0.8);
   }
+  // destaque de tecla: halo âmbar suave no painel ao redor da tecla (aditivo, pulsa) + a própria tecla acende
+  const keyHalo = {};
+  { keyGeo.computeBoundingBox(); const bb = keyGeo.boundingBox, kw = bb.max.x - bb.min.x, kh = bb.max.y - bb.min.y;
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+    g.filter = 'blur(16px)'; g.fillStyle = 'rgba(255,190,70,0.85)'; rr(52, 52, 152, 152, 34); g.fill();
+    g.filter = 'none'; g.strokeStyle = 'rgba(255,235,170,1)'; g.lineWidth = 9; rr(70, 70, 116, 116, 24); g.stroke();
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    for (const k in keys) {
+      const hm = new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(2.2, 1.9, 1.5), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: 0 });
+      const h = new THREE.Mesh(new THREE.PlaneGeometry(kw * 2.6, kh * 2.6), hm); h.position.set(KEY_X, KEY_Y[k], PANEL_Z + 0.35); h.renderOrder = 4; h.visible = false; h.raycast = () => {}; h.userData.noAO = true;
+      D.add(h); keyHalo[k] = h;
+    }
+  }
   // borracha preta: vãos das teclas, ilhoses das hastes, anel de vedação do globo, pés, tampa USB, rebaixos dos parafusos
   const rub = [];
   rub.push(roundedCyl(6.4, 2.6, 1.0, 32, BH + 12.0).translate(GX, 0, 0));
@@ -379,6 +393,7 @@ export function buildMeter(stage, fw, app) {
     hl = name || null; hlT = 0;
     for (const k in OL) OL[k].forEach((o) => (o.visible = false));
     (OL[hl] || []).forEach((o) => (o.visible = true));
+    for (const k in keyHalo) { const on = hl === k || hl === 'keys' || hl === 'all'; keyHalo[k].visible = on; if (!on) { keys[k].material.emissive.setHex(0x0b3a6e); keys[k].material.emissiveIntensity = 0.12; } }
   }
   function pressAnim(key) { if (key in press) pulses[key] = 0.22; }
 
@@ -475,7 +490,10 @@ export function buildMeter(stage, fw, app) {
     const wetT = (fillOverride ?? waterLevel) > 0.05 && wickKind !== 'seco' ? 1 : 0;
     const nw = wet + (wetT - wet) * Math.min(1, dt * (wetT > wet ? 0.6 : 0.04));
     if (Math.abs(nw - wet) > 1e-4) { wet = nw; applyWick(); }
-    if (hl) { hlT += dt; const a = 0.5 + 0.45 * Math.sin(hlT * 5.5); (OL[hl] || []).forEach((o) => (o.material.opacity = a)); }
+    if (hl) { hlT += dt; const a = 0.5 + 0.45 * Math.sin(hlT * 5.5); (OL[hl] || []).forEach((o) => (o.material.opacity = a));
+      const p = 0.5 + 0.5 * Math.sin(hlT * 4.2);
+      for (const k in keyHalo) if (keyHalo[k].visible) { keyHalo[k].material.opacity = 0.55 + 0.45 * p; keyHalo[k].scale.setScalar(1 + 0.06 * p);
+        keys[k].material.emissive.setRGB(0.55, 0.38, 0.08); keys[k].material.emissiveIntensity = 0.35 + 0.45 * p; } }
   }
 
   setHeight(app?.state?.meterHeight ?? 1.3); applyWater(); applyWick(); update(0);
