@@ -531,16 +531,27 @@ export async function buildWorker(stage, app) {
   const leathM = new THREE.MeshPhysicalMaterial({ color: 0x8a5a2c, roughness: 0.72, sheen: 0.3, sheenColor: new THREE.Color(0xd8b080) });
   const gloves = { 1: [], 2: [] };
   for (const sd of ['L', 'R']) {
-    const w = wpos(B[sd + '_Hand']), dF = wpos(B[sd + '_Finger2']).sub(w).normalize(), up0 = Y.clone().sub(dF.clone().multiplyScalar(dF.y)).normalize(), sd3 = dF.clone().cross(up0);
+    // eixo da luva = antebraço → mão (sempre aponta para os dedos; o vetor mão → Finger2 saía invertido na mão esquerda)
+    const w = wpos(B[sd + '_Hand']), dF = w.clone().sub(wpos(B[sd + '_Forearm'])).normalize(), up0 = Y.clone().sub(dF.clone().multiplyScalar(dF.y)).normalize(), sd3 = dF.clone().cross(up0);
     const basis = new THREE.Matrix4().makeBasis(dF, up0, sd3), q = new THREE.Quaternion().setFromRotationMatrix(basis);
     const mk = (geo, mat, c) => { const m = new THREE.Mesh(geo, mat); m.quaternion.copy(q); m.position.copy(c); m.castShadow = true; scene0.add(m); m.updateMatrixWorld(true); B[sd + '_Hand'].attach(m); return m; };
     const scene0 = stage.scene;
-    const cuffG = new THREE.CylinderGeometry(0.056, 0.047, 0.17, 22, 1, true).rotateZ(Math.PI / 2);
-    const tg = new THREE.Group();
-    const parts = [mk(cuffG, thermM, w.clone().addScaledVector(dF, -0.07)),
-      mk(new THREE.TorusGeometry(0.056, 0.008, 8, 24).rotateY(Math.PI / 2), thermM, w.clone().addScaledVector(dF, -0.155)),
-      mk(new THREE.SphereGeometry(1, 22, 14).scale(0.11, 0.036, 0.062), thermM, w.clone().addScaledVector(dF, 0.075)),
-      mk(new THREE.SphereGeometry(1, 14, 10).scale(0.05, 0.026, 0.024), thermM, wpos(B[sd + '_Finger0']).addScaledVector(dF, 0.02))];
+    // luva térmica de forno inteiriça: perfil de revolução (punho longo → mão → ponta arredondada), achatada na espessura
+    // da mão, fechada na ponta e no punho (o antebraço some dentro dela; sem oco aparente) + polegar + borda dobrada no punho
+    const prof = [[0.0005, -0.058], [0.03, -0.06], [0.045, -0.055], [0.05, -0.04], [0.05, -0.03], [0.054, 0.02], [0.058, 0.07], [0.055, 0.11], [0.046, 0.15], [0.032, 0.178], [0.014, 0.192], [0.0005, 0.196]]
+      .map(([r, x]) => new THREE.Vector2(r, x));
+    const mittG = new THREE.LatheGeometry(prof, 28).rotateZ(-Math.PI / 2).scale(1, 0.68, 1);
+    const tg = null;
+    const parts = [mk(mittG, thermM, w.clone()),
+
+      mk(new THREE.CapsuleGeometry(0.019, 0.06, 6, 12).rotateZ(Math.PI / 2), thermM, wpos(B[sd + '_Finger0']).addScaledVector(dF, 0.025))];
+    { const fa = wpos(B[sd + '_Forearm']), dA = w.clone().sub(fa).normalize(), upA = Y.clone().sub(dA.clone().multiplyScalar(dA.y)).normalize();
+      const qA = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(dA, upA, dA.clone().cross(upA)));
+      const cuffP = [[0.0005, -0.13], [0.03, -0.132], [0.05, -0.128], [0.056, -0.11], [0.052, -0.05], [0.048, 0.0], [0.046, 0.02]].map(([r, x]) => new THREE.Vector2(r, x));
+      for (const [geo, off] of [[new THREE.LatheGeometry(cuffP, 24).rotateZ(-Math.PI / 2).scale(1, 0.78, 1), 0],
+        [new THREE.TorusGeometry(0.055, 0.009, 10, 26).rotateY(Math.PI / 2).scale(1, 0.78, 1), -0.122]]) {
+        const m = new THREE.Mesh(geo, thermM); m.quaternion.copy(qA); m.position.copy(w).addScaledVector(dA, off); m.castShadow = true;
+        stage.scene.add(m); m.updateMatrixWorld(true); B[sd + '_Forearm'].attach(m); parts.push(m); } }
     gloves[1].push(...parts); void tg;
     gloves[2].push(mk(new THREE.CylinderGeometry(0.047, 0.042, 0.075, 20, 1, true).rotateZ(Math.PI / 2), leathM, w.clone().addScaledVector(dF, -0.035)));
   }
@@ -680,7 +691,9 @@ export async function buildWorker(stage, app) {
   const navWalk = (tg) => () => { const nav = navFor(envOf(L.st)); const p = nav?.plan(L.pos.clone(), new THREE.Vector2(tg[0], tg[1]), tripodObs()); walk(p || [[L.pos.x, L.pos.y], tg])(); };
   const turn = (r) => () => { L.turnTo = r; L.mode = 'turn'; };
   const sitDown = (id) => () => { const s = ST[id]; L.from = L.pos.clone(); L.to = new THREE.Vector2(s.worker[0], s.worker[2]).sub(fwdOf(s.workerRotY).multiplyScalar(0.03)); L.hipSeat = SEAT[id] + 0.09; L.sitT = 0; L.mode = 'sitdown'; };
-  const standUp = () => () => { L.from = L.pos.clone(); const s = ST[L.st]; L.to = s ? standOf(L.st) : L.pos.clone(); L.sitT = 0; L.mode = 'standup'; };
+  // levanta para a frente do PRÓPRIO assento (estação capturada ao enfileirar; antes usava a estação de destino e ela
+  // deslizava sentada até o outro posto)
+  const standUp = (seatId = L.st) => () => { L.from = L.pos.clone(); L.to = ST[seatId] ? standOf(seatId) : L.pos.clone(); L.sitT = 0; L.mode = 'standup'; };
   const NAV = {}, NAVB = { fornos: { x0: -8, x1: 8.6, z0: -6, z1: 6 }, caldeiras: { x0: 30, x1: 56, z0: -10, z1: 10 } };
   let navMod = null; import('./worker_nav.js').then((m) => (navMod = m)).catch(() => {});
   function navFor(e) {
@@ -712,7 +725,7 @@ export async function buildWorker(stage, app) {
     }
     if (id === L.st && L.mode !== 'walk' && !L.patrol) { startPatrol(); return; }
     const q = [];
-    if (L.mode === 'seated' || L.mode === 'sitdown') q.push(standUp());
+    if (L.mode === 'seated' || L.mode === 'sitdown') q.push(standUp(L.st));
     const from = L.mode === 'walk' ? null : L.st, cur = () => L.pos.clone();
     q.push(() => walk(route(from, id, cur()))(), turn(s.workerRotY));
     if (s.seated) q.push(sitDown(id));
