@@ -16,43 +16,71 @@ function normalFrom(H, W, Hh, k) {
   g.putImageData(id, 0, 0); return tex(c, false);
 }
 
-// ── pé-de-moleque: pedras irregulares (Voronoi periódico 14×14 por 3 m), abauladas, juntas de terra/musgo, remendos ──
+// ── pé-de-moleque (FOTO da rua): pedras oblongas arredondadas (12–18 cm no sentido da rua × 18–32 cm), assentadas em fiadas
+// transversais levemente curvas e desencontradas; topo abaulado e polido pelo uso, juntas largas de terra escura com
+// oclusão, alguma vegetação; 1024 px = 3 m ⇒ ~2,9 mm/px ──
 export function cobbleTextures() {
-  const S = 1024, N = 11, R = rng(7), cell = S / N;
-  const pts = []; for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) pts.push([(i + 0.05 + R() * 0.9) * cell, (j + 0.05 + R() * 0.9) * cell, R(), R(), R()]);
+  const S = 1024, R = rng(7), M = 3.0 / S; // m por px
+  const rows = []; let tot = 0; while (tot < S - 30) { const h = (0.11 + R() * 0.08) / M; rows.push(h); tot += h; } const k0 = S / tot; for (let i = 0; i < rows.length; i++) rows[i] *= k0;
   const [c, g] = cnv(S), [rc, rg] = cnv(S); const id = g.createImageData(S, S), rid = rg.createImageData(S, S); const H = new Float32Array(S * S);
+  // pedras por fiada (larguras periódicas em S)
+  const stones = rows.map(() => { const a = []; let x = R() * 60, w0 = x; while (x < S + w0 - 40) { const w = (0.14 + R() * 0.2) / M; a.push([x, w, R(), R(), R(), R()]); x += w; } const k = (S) / (x - w0); return a.map(([x2, w, ...r]) => [(x2 - w0) * k + w0, w * k, ...r]); });
+  const y0s = []; { let y = 0; for (const h of rows) { y0s.push(y); y += h; } }
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const ci = Math.floor(x / cell), cj = Math.floor(y / cell); let d1 = 1e9, d2 = 1e9, best = null;
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      const ii = (ci + di + N) % N, jj = (cj + dj + N) % N, p = pts[jj * N + ii];
-      const px = p[0] + (ci + di - ii) * cell, py = p[1] + (cj + dj - jj) * cell; const dd = Math.hypot(x - px, y - py);
-      if (dd < d1) { d2 = d1; d1 = dd; best = p; } else if (dd < d2) d2 = dd;
-    }
-    const e = (d2 - d1) * 0.5, k = (y * S + x) * 4; let col, h, ro;
-    const jw = 4.5 + best[4] * 4; // juntas largas e irregulares (pedras assentadas à mão)
-    if (e < jw) { // junta: terra escura com musgo
-      const m = R(); h = -1.2; col = m < 0.4 ? [52, 60, 36] : [64, 55, 44]; ro = 245;
-    } else {
-      const dome = Math.min(1, (e - jw) / 22); h = Math.sqrt(dome) * 1.4 + (R() - 0.5) * 0.08;
-      const t = best[2], v = 70 + t * 42 - (1 - dome) * 30; // pedra cinza-escura (quartzito), algumas ferruginosas/ocres, poucas azuladas
-      col = best[3] < 0.3 ? [v + 20, v + 10, v - 2] : best[3] < 0.75 ? [v + 3, v + 1, v - 3] : [v - 4, v, v + 5];
-      const wear = Math.pow(dome, 4) * 14; col = col.map((q) => q + wear); ro = 150 - dome * 70 + best[4] * 30; // topo gasto, mais liso
+    const yy = (y + 7 * Math.sin((x / S) * Math.PI * 2) + S) % S; // fiadas levemente curvas (periódico)
+    let r = 0; while (r < rows.length - 1 && y0s[r + 1] <= yy) r++;
+    const ly = yy - y0s[r], rh = rows[r]; const st = stones[r]; let si = 0, xx = x;
+    if (xx < st[0][0]) xx += S; while (si < st.length - 1 && st[si + 1][0] <= xx) si++;
+    const s0 = st[si], lx = xx - s0[0], sw = s0[1]; const dyS = (s0[5] - 0.5) * 12; // cada pedra um pouco desencontrada na fiada
+    const jw = 4 + s0[4] * 4; // junta 1,2–2,3 cm
+    const lyS = ly - dyS, ex = Math.min(lx, sw - lx) - jw * 0.5, ey = Math.min(lyS, rh - Math.abs(dyS) * 0.6 - lyS) - jw * 0.5 * 0.8;
+    const k = (y * S + x) * 4; let col, h, ro;
+    if (ex <= 0 || ey <= 0) { const m = R(); h = -1.4; col = m < 0.18 ? [56, 64, 34] : [48, 42, 35]; ro = 250; }
+    else {
+      // perfil arredondado: superelipse a partir das distâncias às bordas
+      const nx = Math.min(1, ex / (sw * 0.32)), ny = Math.min(1, ey / (rh * 0.36)); const dome = Math.sqrt(Math.max(0, 1 - Math.pow(1 - nx, 2.2) - Math.pow(1 - ny, 2.2)) );
+      h = dome * 1.5 + (R() - 0.5) * 0.06;
+      const t = s0[2], v = 74 + t * 40; // cinza-escuro, umas mais marrons/ocres (quartzito, itabirito)
+      const tint = s0[3] < 0.35 ? [12, 6, -4] : s0[3] < 0.85 ? [3, 1, -2] : [-2, 0, 3];
+      const shade = 0.55 + 0.45 * dome, polish = Math.pow(dome, 6) * 26;
+      col = [v * shade + tint[0] + polish, v * shade + tint[1] + polish, v * shade + tint[2] + polish * 0.95];
+      ro = 215 - Math.pow(dome, 3) * 120 + s0[4] * 20; // topo polido
     }
     H[y * S + x] = h; id.data[k] = col[0]; id.data[k + 1] = col[1]; id.data[k + 2] = col[2]; id.data[k + 3] = 255;
     rid.data[k] = rid.data[k + 1] = rid.data[k + 2] = ro; rid.data[k + 3] = 255;
   }
   g.putImageData(id, 0, 0); rg.putImageData(rid, 0, 0);
-  // remendos de cimento e manchas de umidade
-  for (let i = 0; i < 3; i++) { g.fillStyle = 'rgba(150,146,138,0.55)'; g.beginPath(); g.ellipse(R() * S, R() * S, 30 + R() * 50, 18 + R() * 30, R() * 3, 0, 7); g.fill(); }
-  return { map: tex(c), rough: tex(rc, false), normal: normalFrom(H, S, S, 2.2), size: 3.0 };
+  // remendos de cimento (raros)
+  for (let i = 0; i < 2; i++) { g.fillStyle = 'rgba(128,124,116,0.75)'; g.beginPath(); g.ellipse(R() * S, R() * S, 40 + R() * 50, 25 + R() * 30, R() * 3, 0, 7); g.fill(); }
+  return { map: tex(c), rough: tex(rc, false), normal: normalFrom(H, S, S, 3.2), size: 3.0 };
+}
+
+// ── capim/musgo nas juntas junto ao meio-fio (faixa com alfa) ──
+export function grassStripTexture() {
+  const W = 256, Hh = 1024, R = rng(51); const [c, g] = cnv(W, Hh); g.clearRect(0, 0, W, Hh);
+  for (let i = 0; i < 2600; i++) { const x = Math.pow(R(), 1.8) * W, y = R() * Hh, l = 3 + R() * 14 * (1 - x / W);
+    g.strokeStyle = `rgba(${50 + R() * 50},${80 + R() * 60},${25 + R() * 25},${0.5 + R() * 0.5})`; g.lineWidth = 1 + R() * 1.5;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + (R() - 0.5) * l, y - l); g.stroke(); }
+  return tex(c);
+}
+
+// ── tampa de ferro fundido com padrão em relevo (losangos) ──
+export function ironCoverTextures() {
+  const S = 256; const [c, g] = cnv(S); const H = new Float32Array(S * S); const id = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = ((x + y) % 32) / 32, v = ((x - y + S) % 32) / 32; const d = Math.min(u, 1 - u, v, 1 - v); const rim = Math.min(x, y, S - 1 - x, S - 1 - y) < 10;
+    const h = rim ? 1 : d > 0.12 ? 0.8 : 0; H[y * S + x] = h; const k = (y * S + x) * 4, rust = ((x * 7 + y * 13) % 23) < 2 ? 30 : 0;
+    const v2 = 40 + h * 30; id.data[k] = v2 + rust; id.data[k + 1] = v2 + rust * 0.4; id.data[k + 2] = v2; id.data[k + 3] = 255;
+  }
+  g.putImageData(id, 0, 0); return { map: tex(c, true, false), normal: normalFrom(H, S, S, 4) };
 }
 
 // ── lajes de quartzito do passeio (retângulos irregulares, gastos) ──
 export function slabTextures() {
   const W = 512, Hh = 1024, R = rng(19); const [c, g] = cnv(W, Hh); const H = new Float32Array(W * Hh);
-  g.fillStyle = '#6d665c'; g.fillRect(0, 0, W, Hh);
-  let y = 0; while (y < Hh) { const h = 110 + R() * 110; let x = 0; while (x < W) { const w = Math.min(W - x, 140 + R() * 220);
-      const v = 150 + R() * 40, tint = R(); g.fillStyle = `rgb(${v + 8 + tint * 10},${v + 2},${v - 10 - tint * 8})`; g.fillRect(x + 3, y + 3, w - 6, h - 6);
+  g.fillStyle = '#3e3a33'; g.fillRect(0, 0, W, Hh);
+  let y = 0; while (y < Hh) { const h = 200 + R() * 200; let x = 0; while (x < W) { const w = Math.min(W - x, 220 + R() * 300);
+      const v = 112 + R() * 36, tint = R(); g.fillStyle = `rgb(${v + 14 + tint * 14},${v + 6 + tint * 4},${v - 8})`; g.fillRect(x + 3, y + 3, w - 6, h - 6);
       for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(${R() < 0.5 ? '90,80,70' : '230,224,210'},${0.05 + R() * 0.1})`; g.fillRect(x + R() * w, y + R() * h, 2 + R() * 18, 1 + R() * 3); }
       for (let yy = Math.floor(y + 3); yy < Math.min(Hh, y + h - 3); yy++) for (let xx = Math.floor(x + 3); xx < Math.min(W, x + w - 3); xx++) H[yy * W + xx] = 1;
       x += w; } y += h; }
@@ -145,9 +173,9 @@ export function hangingSignTexture(text, sub) {
 // ── céu: gradiente azul profundo + cirros ──
 export function skyTexture() {
   const W = 1024, Hh = 512, R = rng(5); const [c, g] = cnv(W, Hh);
-  const gr = g.createLinearGradient(0, 0, 0, Hh); gr.addColorStop(0, '#1e5bb0'); gr.addColorStop(0.38, '#4f8fd6'); gr.addColorStop(0.49, '#b7d2ea'); gr.addColorStop(0.5, '#cfdbe2'); gr.addColorStop(1, '#8c8f84');
+  const gr = g.createLinearGradient(0, 0, 0, Hh); gr.addColorStop(0, '#2c62b4'); gr.addColorStop(0.38, '#6c9fdc'); gr.addColorStop(0.49, '#b7d2ea'); gr.addColorStop(0.5, '#cfdbe2'); gr.addColorStop(1, '#8c8f84');
   g.fillStyle = gr; g.fillRect(0, 0, W, Hh);
-  for (let i = 0; i < 70; i++) { const x = R() * W, y = 40 + R() * Hh * 0.36, l = 60 + R() * 240; g.strokeStyle = `rgba(255,255,255,${0.06 + R() * 0.16})`; g.lineWidth = 2 + R() * 6; g.lineCap = 'round';
+  for (let i = 0; i < 260; i++) { const x = R() * W, y = 20 + R() * Hh * 0.42, l = 40 + R() * 260; g.strokeStyle = `rgba(255,255,255,${0.05 + R() * 0.18})`; g.lineWidth = 2 + R() * 6; g.lineCap = 'round';
     g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + l * 0.3, y - 8 - R() * 10, x + l * 0.7, y + 6, x + l, y - 4); g.stroke(); }
   const t = tex(c, true, false); t.wrapS = THREE.RepeatWrapping; return t;
 }

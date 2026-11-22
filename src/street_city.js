@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RUA, ruaY } from './layout_rua.js';
 import { Merger, buildChurch, buildAdro, miniChurch } from './street_city_church.js';
 import { buildProps } from './street_city_props.js';
+import { buildPeople } from './street_city_people.js';
 import * as TX from './street_city_tex.js';
 
 const { rnd } = TX;
@@ -36,15 +37,17 @@ export function buildCity(stage, app) {
     lampGlass: std({ color: '#efe2bd', emissive: '#ffcf80', emissiveIntensity: 0.12, roughness: 0.15, metalness: 0.1 }),
     terra: std({ color: '#a2573a', roughness: 0.85 }), leaf: std({ color: '#3d5e2a' }), flower: std({ color: '#c23a4a', roughness: 0.7 }),
     people: std({ vertexColors: true, roughness: 0.85 }),
+    grime: std({ map: TX.grimeTex(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, roughness: 1 }),
+    dome: std({ map: TX.domeTex(), metalness: 0.4, roughness: 0.55 }), cobble: std({ map: TX.cobbleTex(), roughness: 0.9 }, 2),
   };
-  mats.relief.userData.noCast = true;
+  mats.relief.userData.noCast = true; mats.grime.userData.noCast = true;
 
   // ── igreja, adro, igrejinhas distantes ──
   const M = new Merger();
   buildChurch(M); buildAdro(M);
   for (const [x, z, ry, k] of [[-62, 196, 0.5, 0.9], [118, -150, 2.6, 0.85], [96, 168, -0.6, 0.75]]) miniChurch(M, x, cityH(x, z) - 0.5, z, ry, k);
   M.build(g, mats);
-  buildProps(g, mats);
+  const props = buildProps(g, mats); const people = buildPeople(g);
 
   // ── terreno ──
   const S = 760, N = 170, tg = new THREE.PlaneGeometry(S, S, N, N); tg.rotateX(-Math.PI / 2); tg.translate(19, 0, 40);
@@ -120,5 +123,5 @@ export function buildCity(stage, app) {
 
   const vis = () => (app?.street?.group ? app.street.group.visible : stage.env === 'rua');
   g.visible = vis();
-  return { group: g, cityH, update() { const v = vis(); if (g.visible !== v) g.visible = v; } };
+  return { group: g, cityH, update(dt, t) { const v = vis(); if (g.visible !== v) g.visible = v; if (!v) return; props.update?.(dt, t); people.update(dt, t); } };
 }

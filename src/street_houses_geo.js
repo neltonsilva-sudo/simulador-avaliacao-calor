@@ -35,26 +35,26 @@ export class Facade {
   // quad em pontos locais [[a,d,y]×4]; uvMode: 'f' fachada (u=a), 's' lateral (u=d), 't' topo, 'r' bruto
   q(b, pts, n, col, mode = 'f', uvs) {
     const P = pts.map((p) => this.P(p[0], p[1], p[2])), uo = this.uo, S = 4.6;
-    const UV = uvs || pts.map(([a, d, y]) => mode === 's' ? [d / S + uo, (y - this.vb) / this.vh] : mode === 't' ? [a / S + uo, d / S] : [a / S + uo, (y - this.vb) / this.vh]);
+    const UV = uvs || pts.map(([a, d, y]) => mode === 'm' ? [(Math.abs(n[0]) > 0.5 ? d : a) / 1.3, (Math.abs(n[2]) > 0.5 ? d : y) / 1.3] : mode === 's' ? [d / S + uo, (y - this.vb) / this.vh] : mode === 't' ? [a / S + uo, d / S] : [a / S + uo, (y - this.vb) / this.vh]);
     b.quad(P, this.N(...n), UV, col);
   }
   /** caixa local: faces opcionais (skip: 'b' fundo, 'k' costas (−d), 'y' base) */
-  box(b, a0, a1, d0, d1, y0, y1, col, skip = '') {
-    if (!skip.includes('f')) this.q(b, [[a0, d1, y0], [a1, d1, y0], [a1, d1, y1], [a0, d1, y1]], [0, 1, 0], col);
-    if (!skip.includes('k')) this.q(b, [[a0, d0, y0], [a1, d0, y0], [a1, d0, y1], [a0, d0, y1]], [0, -1, 0], col);
-    this.q(b, [[a1, d0, y0], [a1, d1, y0], [a1, d1, y1], [a1, d0, y1]], [1, 0, 0], col, 's');
-    this.q(b, [[a0, d0, y0], [a0, d1, y0], [a0, d1, y1], [a0, d0, y1]], [-1, 0, 0], col, 's');
-    if (!skip.includes('t')) this.q(b, [[a0, d0, y1], [a1, d0, y1], [a1, d1, y1], [a0, d1, y1]], [0, 0, 1], col, 't');
-    if (!skip.includes('y')) this.q(b, [[a0, d0, y0], [a1, d0, y0], [a1, d1, y0], [a0, d1, y0]], [0, 0, -1], col, 't');
+  box(b, a0, a1, d0, d1, y0, y1, col, skip = '', md) {
+    if (!skip.includes('f')) this.q(b, [[a0, d1, y0], [a1, d1, y0], [a1, d1, y1], [a0, d1, y1]], [0, 1, 0], col, md || 'f');
+    if (!skip.includes('k')) this.q(b, [[a0, d0, y0], [a1, d0, y0], [a1, d0, y1], [a0, d0, y1]], [0, -1, 0], col, md || 'f');
+    this.q(b, [[a1, d0, y0], [a1, d1, y0], [a1, d1, y1], [a1, d0, y1]], [1, 0, 0], col, md || 's');
+    this.q(b, [[a0, d0, y0], [a0, d1, y0], [a0, d1, y1], [a0, d0, y1]], [-1, 0, 0], col, md || 's');
+    if (!skip.includes('t')) this.q(b, [[a0, d0, y1], [a1, d0, y1], [a1, d1, y1], [a0, d1, y1]], [0, 0, 1], col, md || 't');
+    if (!skip.includes('y')) this.q(b, [[a0, d0, y0], [a1, d0, y0], [a1, d1, y0], [a0, d1, y0]], [0, 0, -1], col, md || 't');
   }
   /** parede plana em d com vãos retangulares (holes: {a0,a1,y0,y1}) */
-  wall(b, a0, a1, y0, y1, d, holes, col) {
+  wall(b, a0, a1, y0, y1, d, holes, col, md = 'f') {
     const xs = [...new Set([a0, a1, ...holes.flatMap((h) => [h.a0, h.a1]).filter((x) => x > a0 && x < a1)])].sort((p, q) => p - q);
     for (let i = 0; i < xs.length - 1; i++) {
       const ca = xs[i], cb = xs[i + 1], m = (ca + cb) / 2; let y = y0;
       const hs = holes.filter((h) => h.a0 <= m && h.a1 >= m && h.y1 > y0 && h.y0 < y1).sort((p, q) => p.y0 - q.y0);
-      for (const h of hs) { if (h.y0 > y) this.q(b, [[ca, d, y], [cb, d, y], [cb, d, h.y0], [ca, d, h.y0]], [0, 1, 0], col); y = Math.max(y, h.y1); }
-      if (y < y1) this.q(b, [[ca, d, y], [cb, d, y], [cb, d, y1], [ca, d, y1]], [0, 1, 0], col);
+      for (const h of hs) { if (h.y0 > y) this.q(b, [[ca, d, y], [cb, d, y], [cb, d, h.y0], [ca, d, h.y0]], [0, 1, 0], col, md); y = Math.max(y, h.y1); }
+      if (y < y1) this.q(b, [[ca, d, y], [cb, d, y], [cb, d, y1], [ca, d, y1]], [0, 1, 0], col, md);
     }
   }
 }
@@ -116,23 +116,52 @@ export function sashGeo(W, T, r, kind = 'g', z = -0.1) {
 }
 
 // ───────────────────────── sacada (laje top em y = 0, parede em z = 0) ─────────────────────────
-export function balconyGeo(Wr = 1.6, D = 0.6, H = 1.0) {
-  const stone = [boxAt(Wr, 0.09, D, 0, -0.045, D / 2), boxAt(Wr - 0.08, 0.06, D - 0.05, 0, -0.12, (D - 0.05) / 2)];
-  for (const s of [-1, 1]) { const g = new THREE.CylinderGeometry(0.09, 0.02, 0.42, 4, 1).rotateY(Math.PI / 4).scale(0.9, 1, 3).translate(s * (Wr / 2 - 0.22), -0.36, 0.13); stone.push(g); }
-  const iron = [], gold = [], hw = Wr / 2 - 0.05, zf = D - 0.05;
-  const post = (x, z) => { iron.push(boxAt(0.035, H, 0.035, x, H / 2, z)); gold.push(new THREE.SphereGeometry(0.032, 10, 8).translate(x, H + 0.045, z), new THREE.CylinderGeometry(0.012, 0.022, 0.03, 8).translate(x, H + 0.012, z)); };
+/** style 'rings' (argolas + volutas) ou 'loops' (pares de barras com arco e contas douradas); rail: corrimão de madeira */
+export function balconyGeo(Wr = 1.6, D = 0.6, H = 1.0, style = 'rings', rail = false) {
+  const stone = [boxAt(Wr, 0.09, D, 0, -0.045, D / 2), boxAt(Wr - 0.08, 0.06, D - 0.05, 0, -0.12, (D - 0.05) / 2), boxAt(Wr - 0.16, 0.04, D - 0.1, 0, -0.17, (D - 0.1) / 2)];
+  const nbr = Wr > 2 ? 0 : 2;
+  for (let i = 0; i < nbr; i++) { const x = -Wr / 2 + 0.22 + i * (Wr - 0.44) / (nbr - 1); stone.push(new THREE.CylinderGeometry(0.08, 0.02, 0.26, 4, 1).rotateY(Math.PI / 4).scale(0.9, 1, 2.6).translate(x, -0.3, 0.12)); }
+  const iron = [], gold = [], wood = [], hw = Wr / 2 - 0.05, zf = D - 0.05;
+  const post = (x, z) => { iron.push(boxAt(0.035, H, 0.035, x, H / 2, z)); if (!rail) gold.push(new THREE.SphereGeometry(0.032, 10, 8).translate(x, H + 0.045, z), new THREE.CylinderGeometry(0.012, 0.022, 0.03, 8).translate(x, H + 0.012, z)); };
   post(-hw, zf); post(hw, zf); post(-hw, 0.04); post(hw, 0.04);
-  for (const yy of [0.07, H - 0.02]) { iron.push(boxAt(2 * hw, 0.04, 0.045, 0, yy, zf)); for (const s of [-1, 1]) iron.push(boxAt(0.045, 0.04, zf, s * hw, yy, zf / 2)); }
-  iron.push(boxAt(2 * hw, 0.022, 0.025, 0, H - 0.2, zf)); for (const s of [-1, 1]) iron.push(boxAt(0.025, 0.022, zf, s * hw, H - 0.2, zf / 2));
-  const nb = Math.round(2 * hw / 0.11);
-  for (let i = 1; i < nb; i++) { const x = -hw + i * 2 * hw / nb; iron.push(boxAt(0.016, H - 0.29, 0.016, x, 0.09 + (H - 0.29) / 2, zf));
-    if (i < nb) { const ring = new THREE.TorusGeometry(0.06, 0.007, 4, 14).translate(x + hw / nb, H - 0.11, zf); iron.push(ring); gold.push(new THREE.SphereGeometry(0.015, 8, 6).translate(x + hw / nb, H - 0.11, zf)); } }
-  for (const s of [-1, 1]) for (let z = 0.15; z < zf - 0.05; z += 0.11) iron.push(boxAt(0.016, H - 0.11, 0.016, s * hw, 0.09 + (H - 0.11) / 2, z));
-  // volutas em "C" na faixa de baixo (frente) com rosetas douradas
-  for (let i = 0; i < nb; i += 2) { const x = -hw + (i + 1) * 2 * hw / nb; for (const sy of [-1, 1]) { const t = new THREE.TorusGeometry(0.045, 0.007, 4, 10, Math.PI).rotateZ(sy < 0 ? Math.PI : 0).translate(x, 0.22 + sy * 0.045, zf); iron.push(t); }
-    gold.push(new THREE.SphereGeometry(0.018, 8, 6).translate(x, 0.22, zf + 0.01)); }
-  return { stone: merge(stone), iron: merge(iron), gold: merge(gold) };
+  iron.push(boxAt(2 * hw, 0.04, 0.045, 0, 0.07, zf)); for (const sx of [-1, 1]) iron.push(boxAt(0.045, 0.04, zf, sx * hw, 0.07, zf / 2));
+  if (rail) { wood.push(boxAt(2 * hw + 0.1, 0.055, 0.085, 0, H + 0.02, zf)); for (const sx of [-1, 1]) wood.push(boxAt(0.085, 0.055, zf + 0.04, sx * hw, H + 0.02, zf / 2)); }
+  else { iron.push(boxAt(2 * hw, 0.04, 0.045, 0, H - 0.02, zf)); for (const sx of [-1, 1]) iron.push(boxAt(0.045, 0.04, zf, sx * hw, H - 0.02, zf / 2)); }
+  if (style === 'loops') {
+    const pw = 0.17, np = Math.max(2, Math.round(2 * hw / pw));
+    const loop = (x, z, alongX) => { const r = 0.045, yA = H - 0.12;
+      for (const o of [-r, r]) iron.push(alongX ? boxAt(0.014, yA - 0.09, 0.014, x + o, 0.09 + (yA - 0.09) / 2, z) : boxAt(0.014, yA - 0.09, 0.014, x, 0.09 + (yA - 0.09) / 2, z + o));
+      const t = new THREE.TorusGeometry(r, 0.007, 4, 10, Math.PI); if (!alongX) t.rotateY(Math.PI / 2); iron.push(t.translate(x, yA, z));
+      const t2 = new THREE.TorusGeometry(r, 0.007, 4, 10, Math.PI).rotateZ(Math.PI); if (!alongX) t2.rotateY(Math.PI / 2); iron.push(t2.translate(x, 0.2, z));
+      for (const o of [-r, r]) gold.push(new THREE.CylinderGeometry(0.014, 0.014, 0.05, 8).translate(alongX ? x + o : x, H * 0.5, alongX ? z : z + o)); };
+    for (let i = 0; i < np; i++) loop(-hw + (i + 0.5) * 2 * hw / np, zf, true);
+    for (const sx of [-1, 1]) for (let z = 0.14; z < zf - 0.06; z += pw) loop(sx * hw, z, false);
+    iron.push(boxAt(2 * hw, 0.02, 0.02, 0, H - 0.05, zf));
+  } else {
+    iron.push(boxAt(2 * hw, 0.022, 0.025, 0, H - 0.2, zf)); for (const sx of [-1, 1]) iron.push(boxAt(0.025, 0.022, zf, sx * hw, H - 0.2, zf / 2));
+    const nb = Math.round(2 * hw / 0.11);
+    for (let i = 1; i < nb; i++) { const x = -hw + i * 2 * hw / nb; iron.push(boxAt(0.016, H - 0.29, 0.016, x, 0.09 + (H - 0.29) / 2, zf));
+      iron.push(new THREE.TorusGeometry(0.06, 0.007, 4, 14).translate(x + hw / nb, H - 0.11, zf)); gold.push(new THREE.SphereGeometry(0.015, 8, 6).translate(x + hw / nb, H - 0.11, zf)); }
+    for (const sx of [-1, 1]) for (let z = 0.15; z < zf - 0.05; z += 0.11) iron.push(boxAt(0.016, H - 0.11, 0.016, sx * hw, 0.09 + (H - 0.11) / 2, z));
+    for (let i = 0; i < nb; i += 2) { const x = -hw + (i + 1) * 2 * hw / nb; for (const sy of [-1, 1]) iron.push(new THREE.TorusGeometry(0.045, 0.007, 4, 10, Math.PI).rotateZ(sy < 0 ? Math.PI : 0).translate(x, 0.22 + sy * 0.045, zf));
+      gold.push(new THREE.SphereGeometry(0.018, 8, 6).translate(x, 0.22, zf + 0.01)); }
+  }
+  return { stone: merge(stone), iron: merge(iron), gold: merge(gold), wood: wood.length ? merge(wood) : null };
 }
+/** lampião pendente: mão-francesa na parede (z = 0), corrente e lanterna sextavada; y = 0 no braço */
+export function lanternGeo() {
+  const iron = [boxAt(0.08, 0.16, 0.015, 0, -0.03, 0.008), boxAt(0.025, 0.025, 0.4, 0, 0, 0.2), boxAt(0.015, 0.2, 0.015, 0, -0.1, 0.05).rotateX(0.6).translate(0, 0, 0.06),
+    boxAt(0.01, 0.14, 0.01, 0, -0.08, 0.38),
+    new THREE.CylinderGeometry(0.025, 0.15, 0.1, 6).translate(0, -0.2, 0.38), new THREE.SphereGeometry(0.025, 8, 6).translate(0, -0.14, 0.38),
+    new THREE.CylinderGeometry(0.1, 0.06, 0.07, 6).translate(0, -0.55, 0.38), new THREE.CylinderGeometry(0.012, 0.03, 0.06, 6).translate(0, -0.61, 0.38)];
+  for (let k = 0; k < 6; k++) { const an = k * Math.PI / 3; iron.push(boxAt(0.012, 0.28, 0.012, Math.cos(an) * 0.112, -0.38, 0.38 + Math.sin(an) * 0.112)); }
+  const glass = new THREE.CylinderGeometry(0.115, 0.095, 0.28, 6, 1, true).translate(0, -0.38, 0.38);
+  return { iron: merge(iron), glass: merge([glass]) };
+}
+/** venezianas abertas rentes à parede, dos dois lados do vão (uv 0..1 por folha) */
+export function shutterGeo(W, Ht, fw) { const L = []; for (const sx of [-1, 1]) L.push(boxAt(W / 2 + 0.02, Ht, 0.035, sx * (W / 2 + fw + W / 4 + 0.03), Ht / 2, 0.02)); return merge(L); }
+/** grade de ferro (barras verticais) logo atrás do plano da fachada */
+export function grilleGeo(W, Ht) { const L = []; for (let x = -W / 2 + 0.1; x < W / 2 - 0.05; x += 0.12) L.push(boxAt(0.018, Ht, 0.018, x, Ht / 2, -0.06)); for (const y of [0.3, Ht - 0.3]) L.push(boxAt(W, 0.035, 0.01, 0, y, -0.05)); return merge(L); }
 
 // ───────────────────────── telhado ─────────────────────────
 /** fiada de telhas capa-canal, 1 m de largura (x ∈ [−0,5; 0,5]), z ∈ [−L; 0] (z = 0 borda baixa exposta) */

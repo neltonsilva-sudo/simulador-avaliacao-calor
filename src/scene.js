@@ -252,7 +252,7 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
   // ── perfil externo 'rua' (voo entre os ambientes): sol direcional com sombra nítida, céu azul como IBL, exposição de dia,
   // sem névoa interna, sem AO/SSR/haze/reflexo do piso, bloom contido, plano distante maior para o céu e a igreja ao fundo
   const outRig = new THREE.Group(); outRig.name = 'lights_rua'; outRig.visible = false; scene.add(outRig);
-  const skyHemi = new THREE.HemisphereLight(0xb9d3f0, 0x8a7a66, 1.1); outRig.add(skyHemi);
+  const skyHemi = new THREE.HemisphereLight(0xa9c6ec, 0x7a6a58, 0.85); outRig.add(skyHemi);
   let skyEnv = null;
   function skyEnvMap() {
     if (skyEnv) return skyEnv;
@@ -264,22 +264,24 @@ export async function createStage(canvas, { quality = 'high', app } = {}) {
     const sun = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(60, 55, 46) })); sun.position.set(5.4, 7.6, -3.9); s2.add(sun);
     skyEnv = pmrem.fromScene(s2, 0.02, 0.1, 50).texture; return skyEnv;
   }
-  const OUT = { exposure: 0.62, contrast: 0.2, fog: [0.0012, 0.0, [0.62, 0.72, 0.86], [0.78, 0.74, 0.66]], sun: { pos: [18.9 + 16, 26, 14], target: [18.9, 0, 8], i: 3.4, color: new THREE.Color(1.0, 0.93, 0.82) } };
+  // fim de tarde (FOTO da rua): sol baixo a leste-nordeste (~38°) — fachadas do lado oeste iluminadas, passeio leste em sombra
+  // profunda; céu azul intenso; pouco preenchimento para manter o contraste forte da foto
+  const OUT = { exposure: 0.8, contrast: 0.28, sat: 1.1, fog: [0.0009, 0.0, [0.55, 0.66, 0.84], [0.8, 0.72, 0.6]], sun: { pos: [18.9 + 22, 27, 8 - 9], target: [18.9, 0, 8], i: 4.6, color: new THREE.Color(1.0, 0.86, 0.68) } };
   let saved = null;
   // rua, sobrados e cidade só existem no voo externo (dentro dos prédios ficam ocultos: custo zero)
   const showStreet = (on) => { for (const k of ['street', 'streetHouses', 'streetCity']) { const gr = app?.[k]?.group; if (gr) gr.visible = on; } };
   app?.on?.('ready', () => { if (!saved) showStreet(false); });
   function setOutdoor(on) {
     if (on && !saved) {
-      saved = { ao: P.ao, ssr: P.ssr, haze: P.haze, bloomThr: P.bloomThr, bloom: P.bloom, vignette: P.vignette, far: camera.far, env: scene.environment, envI: scene.environmentIntensity, sm: key.shadow.mapSize.x };
+      saved = { sat: P.sat, ao: P.ao, ssr: P.ssr, haze: P.haze, bloomThr: P.bloomThr, bloom: P.bloom, vignette: P.vignette, far: camera.far, env: scene.environment, envI: scene.environmentIntensity, sm: key.shadow.mapSize.x };
       stage.env = 'rua'; lightRig.visible = false; outRig.visible = true; showStreet(true);
       stage._dof.target = null; stage._dof.want = 0; P.ao = 0; P.ssr = 0; P.haze = 0; P.bloomThr = 3.5; P.bloom = 0.12; P.vignette = 0.12; camera.far = 420; camera.updateProjectionMatrix();
-      scene.environment = skyEnvMap(); scene.environmentIntensity = 0.9;
+      scene.environment = skyEnvMap(); scene.environmentIntensity = 0.55;
       key.position.set(...OUT.sun.pos); key.target.position.set(...OUT.sun.target); key.intensity = OUT.sun.i; key.color.copy(OUT.sun.color);
       Object.assign(key.shadow.camera, { left: -34, right: 34, top: 60, bottom: -60, near: 1, far: 90 }); key.shadow.camera.updateProjectionMatrix(); key.target.updateMatrixWorld();
-      P.exposure = OUT.exposure; P.contrast = OUT.contrast; P.fogDens = OUT.fog[0]; P.fogK = OUT.fog[1]; P.fogCool.set(...OUT.fog[2]); P.fogWarm.set(...OUT.fog[3]);
+      P.exposure = OUT.exposure; P.contrast = OUT.contrast; P.sat = OUT.sat; P.fogDens = OUT.fog[0]; P.fogK = OUT.fog[1]; P.fogCool.set(...OUT.fog[2]); P.fogWarm.set(...OUT.fog[3]);
     } else if (!on && saved) {
-      Object.assign(P, { ao: saved.ao, ssr: saved.ssr, haze: saved.haze, bloomThr: saved.bloomThr, bloom: saved.bloom, vignette: saved.vignette });
+      Object.assign(P, { sat: saved.sat, ao: saved.ao, ssr: saved.ssr, haze: saved.haze, bloomThr: saved.bloomThr, bloom: saved.bloom, vignette: saved.vignette });
       camera.far = saved.far; camera.updateProjectionMatrix(); scene.environment = saved.env; scene.environmentIntensity = saved.envI;
       outRig.visible = false; showStreet(false); saved = null;
     }

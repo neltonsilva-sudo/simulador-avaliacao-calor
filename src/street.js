@@ -5,7 +5,10 @@
 // O grupo só fica visível durante o voo entre os ambientes (o palco liga/desliga) — custo zero dentro dos prédios.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { RUA, ruaY } from './layout_rua.js';
+import * as LR from './layout_rua.js';
+const { RUA, ruaY } = LR;
+// curva leve em S (proposta para layout_rua.js como ruaX): nula diante dos prédios (|z| ≤ 8), até ±1,2 m nas pontas
+export const ruaX = LR.ruaX ?? ((z) => (Math.abs(z) <= 8 ? 0 : 1.2 * Math.sign(z) * Math.sin((Math.abs(z) - 8) / 14)));
 import { HALL } from './layout.js';
 import { HALL2 } from './layout_caldeiras.js';
 import * as TX from './street_tex.js';
@@ -17,7 +20,7 @@ function ribbon(x0, x1, nx, nz, yfn, su, sv) {
   const g = new THREE.PlaneGeometry(1, 1, nx, nz); const p = g.attributes.position, uv = g.attributes.uv;
   for (let i = 0; i < p.count; i++) {
     const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5, x = x0 + (x1 - x0) * u, z = ZB - (ZB - ZA) * v;
-    p.setXYZ(i, x, yfn(x, z), z); uv.setXY(i, x / su, z / sv);
+    p.setXYZ(i, x + ruaX(z), yfn(x, z), z); uv.setXY(i, x / su, z / sv);
   }
   g.computeVertexNormals(); return g;
 }
@@ -25,14 +28,14 @@ function ribbon(x0, x1, nx, nz, yfn, su, sv) {
 export function buildStreet(stage) {
   const root = new THREE.Group(); root.name = 'rua'; root.visible = false; stage.scene.add(root);
   const aniso = Math.min(8, stage.renderer.capabilities.getMaxAnisotropy());
-  const [r0, r1] = RUA.road, rc = (r0 + r1) / 2, hw = (r1 - r0) / 2, CURB = 0.17;
+  const [r0, r1] = RUA.road, rc = (r0 + r1) / 2, hw = (r1 - r0) / 2, CURB = 0.2;
 
   // ── pé-de-moleque: abaulado (centro 9 cm mais alto), sarjetas rasas junto ao meio-fio, ondulação de assentamento ──
   const cob = TX.cobbleTextures();
   for (const k of ['map', 'rough', 'normal']) { cob[k].repeat.set(1, 1); cob[k].anisotropy = aniso; }
   const yRoad = (x, z) => { const u = (x - rc) / hw; return ruaY(z) + 0.09 * (1 - u * u) - 0.03 * Math.exp(-((1 - Math.abs(u)) * hw) / 0.25) + 0.012 * Math.sin(x * 1.7 + z * 0.9) * Math.sin(z * 0.6); };
-  const roadM = new THREE.MeshStandardMaterial({ map: cob.map, roughnessMap: cob.rough, normalMap: cob.normal, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 1, envMapIntensity: 0.8 });
-  const road = new THREE.Mesh(ribbon(r0, r1, 24, 220, yRoad, cob.size, cob.size), roadM); road.receiveShadow = true; road.name = 'pe-de-moleque'; root.add(road);
+  const roadM = new THREE.MeshStandardMaterial({ map: cob.map, roughnessMap: cob.rough, normalMap: cob.normal, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 1, envMapIntensity: 1.0 });
+  const road = new THREE.Mesh(ribbon(r0, r1, 24, 260, yRoad, cob.size, cob.size), roadM); road.receiveShadow = true; road.name = 'pe-de-moleque'; root.add(road);
 
   // ── passeios de lajes de quartzito (um degrau acima da rua, acompanhando a ladeira) ──
   const sl = TX.slabTextures(); for (const k of ['map', 'normal']) { sl[k].anisotropy = aniso; }
@@ -45,22 +48,28 @@ export function buildStreet(stage) {
   const blocks = [], R = TX.rng(3);
   for (const [x, s] of [[r0, -1], [r1, 1]]) for (let z = ZA; z < ZB; z += 0.9) {
     const zc = z + 0.45, y = ruaY(zc), L = 0.88 + R() * 0.03, tilt = Math.atan2(ruaY(zc + 0.45) - ruaY(zc - 0.45), 0.9);
-    const g = new THREE.BoxGeometry(0.16, CURB + 0.12, L); g.rotateX(-tilt); g.translate(x + s * 0.06 + (R() - 0.5) * 0.012, y + (CURB - 0.12) / 2 - 0.005 + (R() - 0.5) * 0.008, zc);
+    const g = new THREE.BoxGeometry(0.15 + R() * 0.04, CURB + 0.14, L); g.rotateX(-tilt); g.rotateY(-Math.atan2(ruaX(zc + 0.45) - ruaX(zc - 0.45), 0.9)); g.translate(x + ruaX(zc) + s * 0.06 + (R() - 0.5) * 0.012, y + (CURB - 0.12) / 2 - 0.005 + (R() - 0.5) * 0.008, zc);
     blocks.push(g);
   }
   const curb = new THREE.Mesh(mergeGeometries(blocks.map((g) => g.toNonIndexed())), curbM); curb.castShadow = true; curb.receiveShadow = true; root.add(curb);
 
   // ── tampas de ferro fundido (redondas na rua, retangulares no passeio) e poças d'água ──
-  const ironM = new THREE.MeshStandardMaterial({ color: 0x2a2826, metalness: 0.7, roughness: 0.55, map: (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#3a3632'; g.fillRect(0, 0, 128, 128); g.strokeStyle = '#1c1a18'; g.lineWidth = 3; for (let i = 8; i < 128; i += 14) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(128, i); g.stroke(); } g.fillStyle = 'rgba(140,80,40,0.35)'; for (let i = 0; i < 60; i++) g.fillRect(Math.random() * 128, Math.random() * 128, 4, 3); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })() });
+  const iron = TX.ironCoverTextures();
+  const ironM = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.5, map: iron.map, normalMap: iron.normal, normalScale: new THREE.Vector2(1.5, 1.5) });
   const covers = [];
-  for (const z of [-30, -8, 14, 33]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.03, 24); g.translate(rc + (z % 2 ? 1.6 : -1.4), yRoad(rc, z) + 0.008, z); covers.push(g); }
-  for (const [x, z] of [[(RUA.walkW[0] + RUA.walkW[1]) / 2, -18], [(RUA.walkE[0] + RUA.walkE[1]) / 2, 6], [(RUA.walkE[0] + RUA.walkE[1]) / 2, 27]]) { const g = new THREE.BoxGeometry(0.5, 0.02, 0.7); g.translate(x, yWalk(x, z) + 0.006, z); covers.push(g); }
+  for (const z of [-30, -8, 14, 33]) { const g = new THREE.CylinderGeometry(0.32, 0.32, 0.03, 24); g.translate(rc + (z % 2 ? 1.6 : -1.4) + ruaX(z), yRoad(rc, z) + 0.008, z); covers.push(g); }
+  for (const [x, z] of [[(RUA.walkW[0] + RUA.walkW[1]) / 2, -18], [(RUA.walkE[0] + RUA.walkE[1]) / 2, 6], [(RUA.walkE[0] + RUA.walkE[1]) / 2, 27]]) { const g = new THREE.BoxGeometry(0.5, 0.02, 0.7); g.translate(x + ruaX(z), yWalk(x, z) + 0.006, z); covers.push(g); }
   const cv = new THREE.Mesh(mergeGeometries(covers.map((g) => g.toNonIndexed())), ironM); cv.receiveShadow = true; root.add(cv);
   const puddleA = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 10, 64, 64, 62); gr.addColorStop(0, '#fff'); gr.addColorStop(0.7, '#bbb'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.beginPath(); g.ellipse(64, 64, 62, 40, 0.3, 0, 7); g.fill(); return new THREE.CanvasTexture(c); })();
   const puddleM = new THREE.MeshStandardMaterial({ color: 0x222628, roughness: 0.04, metalness: 0.0, transparent: true, alphaMap: puddleA, opacity: 0.85, depthWrite: false, envMapIntensity: 1.6, polygonOffset: true, polygonOffsetFactor: -2 });
   for (const [x, z, s] of [[r0 + 0.6, -22, 1.2], [rc + 0.8, 4, 0.9], [r1 - 0.5, 19, 1.4], [r0 + 0.5, 38, 1.0]]) {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(1.6 * s, 0.9 * s), puddleM); p.rotation.x = -Math.PI / 2; p.position.set(x, yRoad(x, z) + 0.012, z); p.rotation.z = (R() - 0.5) * 0.8; root.add(p);
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(1.6 * s, 0.9 * s), puddleM); p.rotation.x = -Math.PI / 2; p.position.set(x + ruaX(z), yRoad(x, z) + 0.012, z); p.rotation.z = (R() - 0.5) * 0.8; root.add(p);
   }
+
+  // ── capim e musgo nas juntas junto ao meio-fio (faixa de 0,35 m em cada sarjeta) ──
+  const grassT = TX.grassStripTexture(); grassT.repeat.set(1, 1);
+  const grassM = new THREE.MeshStandardMaterial({ map: grassT, transparent: true, alphaTest: 0.25, roughness: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
+  for (const [a, b] of [[r0, r0 + 0.35], [r1, r1 - 0.35]]) { const gg = ribbon(Math.min(a, b), Math.max(a, b), 1, 200, (x, z) => yRoad(x, z) + 0.01, 0.35, 3.0); if (a > b) { const uv = gg.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, -uv.getX(i)); } const m = new THREE.Mesh(gg, grassM); m.receiveShadow = true; root.add(m); }
 
   // ── chão em volta (terra batida/pedra) e céu com cirros ──
   const groundM = new THREE.MeshStandardMaterial({ color: 0x4d5536, roughness: 0.95 }); // terreno com mato baixo (fora da rua)

@@ -2,8 +2,8 @@
 // vasos de plantas e pedestres estáticos ao longe. Tudo instanciado ou mesclado.
 import * as THREE from 'three';
 import { Merger } from './street_city_church.js';
-import { RUA, ruaY } from './layout_rua.js';
-import { plaqueTex, rnd } from './street_city_tex.js';
+import { RUA, ruaY, ruaX } from './layout_rua.js';
+import { plaqueTex, signTex, clothTex, rnd } from './street_city_tex.js';
 
 const BOX = new THREE.BoxGeometry(1, 1, 1), SPH = new THREE.SphereGeometry(1, 10, 7), CONE4 = new THREE.ConeGeometry(1, 1, 4, 1), CYL = new THREE.CylinderGeometry(1, 1, 1, 8);
 const V2 = (a) => a.map(([x, y]) => new THREE.Vector2(x, y));
@@ -44,7 +44,7 @@ export function buildProps(root, mats) {
   const postPos = [[13.6, 49.2], [24.2, 49.2], [14.9, 58.7], [22.9, 58.7]];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
   const inst = (geo, mat, list) => { const im = new THREE.InstancedMesh(geo, mat, list.length); list.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = true; im.receiveShadow = true; root.add(im); return im; };
-  const wallM = wallPos.map(([x, z, ry]) => new THREE.Matrix4().compose(p.set(x, ruaY(z) + 3.2, z), q.setFromAxisAngle(up, ry), one));
+  const wallM = wallPos.map(([x, z, ry]) => new THREE.Matrix4().compose(p.set(x + ruaX(z), ruaY(z) + 3.2, z), q.setFromAxisAngle(up, ry), one));
   const postM = postPos.map(([x, z]) => new THREE.Matrix4().compose(p.set(x, ruaY(62) + 0.02, z), q.identity(), one));
   inst(W.take('iron'), mats.iron, wallM); inst(W.take('glass'), mats.lampGlass, wallM);
   inst(Pm.take('iron'), mats.iron, postM); inst(Pm.take('glass'), mats.lampGlass, postM);
@@ -52,7 +52,7 @@ export function buildProps(root, mats) {
   // ── placas de esmalte "RUA DIREITA" nas esquinas ──
   const plM = new THREE.MeshStandardMaterial({ map: plaqueTex('RUA DIREITA'), roughness: 0.3, metalness: 0.05 });
   for (const [x, z, ry] of [[RUA.houseW[1] + 0.015, -43.4, Math.PI / 2], [RUA.houseE[0] - 0.015, 43.2, -Math.PI / 2]]) {
-    const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.25), plM); pl.position.set(x, ruaY(z) + 2.9, z); pl.rotation.y = ry; root.add(pl);
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.25), plM); pl.position.set(x + ruaX(z), ruaY(z) + 2.9, z); pl.rotation.y = ry; root.add(pl);
   }
 
   // ── vasos de plantas (terracota) e pedestres, mesclados ──
@@ -65,22 +65,42 @@ export function buildProps(root, mats) {
     for (let i = 0; i < 6; i++) D.add('flower', SPH, x + (rnd() - 0.5) * 0.42, y + 0.6 + rnd() * 0.4, z + (rnd() - 0.5) * 0.42, 0, 0, 0, 0.045, 0.045, 0.045);
   };
   for (const [x, z] of [[15.6, 59.25], [22.2, 59.25], [8.0, 49.0], [29.8, 49.0]]) vaso(x, Ya, z);
-  for (const [x, z] of [[14.42, -13.6], [23.38, 21.4], [14.42, 31.5]]) vaso(x, ruaY(z) + 0.17, z);
+  for (const [x, z] of [[14.42, -8.2], [23.38, 21.4], [14.42, 31.5]]) vaso(x + ruaX(z), ruaY(z) + 0.17, z);
 
-  // pedestres simples (calça, camisa, pele) — discretos, no adro e na escadaria
-  const C = (h) => new THREE.Color(h);
-  const CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 3, 8);
-  const pessoa = (x, y, z, ry, shirt, pants, skin, hair, saia = false, k = 1) => {
-    const c = Math.cos(ry), s = Math.sin(ry), P = (g, lx, ly, lz, col, rz = 0, sx = 1, sy = 1, sz = 1) => D.add('people', g, x + (lx * c + lz * s) * k, y + ly * k, z + (-lx * s + lz * c) * k, 0, ry, rz, sx * k, sy * k, sz * k, col);
-    for (const sx of [-1, 1]) { P(CAP(0.065, 0.72), sx * 0.09, 0.45, 0, C(pants)); P(BOX, sx * 0.09, 0.035, 0.04, C('#2a221c'), 0, 0.1, 0.07, 0.25); }
-    if (saia) P(new THREE.ConeGeometry(0.27, 0.62, 12), 0, 0.64, 0, C(pants));
-    P(CAP(0.16, 0.36), 0, 1.13, 0, C(shirt), 0, 1.12, 1, 0.72);
-    for (const sx of [-1, 1]) { P(CAP(0.05, 0.48), sx * 0.235, 1.1, 0, C(shirt), sx * 0.07); P(SPH, sx * 0.25, 0.8, 0, C(skin), 0, 0.05, 0.06, 0.05); }
-    P(CYL, 0, 1.5, 0, C(skin), 0, 0.05, 0.1, 0.05); P(SPH, 0, 1.62, 0, C(skin), 0, 0.105, 0.125, 0.11); P(SPH, 0, 1.665, 0.02, C(hair), 0, 0.112, 0.1, 0.118);
-  };
-  pessoa(17.4, Ya, 55.4, 0.9, '#7a2e2a', '#2b3140', '#a77a58', '#2a1d14');
-  pessoa(18.25, Ya, 55.9, -2.3, '#d8d2c2', '#5a4a6a', '#8a5f42', '#1a120c', true, 0.96);
-  pessoa(28.2, Ya, 50.6, -1.2, '#3d5a73', '#3a3530', '#b48662', '#3a2a1c'); // sentado? não: em pé junto ao parapeito leste
   D.build(root, mats, { cast: true });
+
+  // ── placas de comércio penduradas em braço de ferro, perpendiculares à fachada (genéricas) ──
+  const SG = new Merger();
+  const signs = [[RUA.houseW[1], -20, 1, 'ARTESANATO', '#2f4a3a', '#e8d9a8'], [RUA.houseE[0], -24, -1, 'CAFÉ', '#7a2a22', '#f0e2c0'], [RUA.houseW[1], 20, 1, 'ANTIQUÁRIO', '#e0b04a', '#2a2018'], [RUA.houseE[0], 28, -1, 'POUSADA', '#24406a', '#efe8d8']];
+  for (const [xw, z, s, txt, bg, fg] of signs) {
+    const x = xw + ruaX(z), y = ruaY(z) + 3.55;
+    SG.add('iron', BOX, x + s * 0.45, y, z, 0, 0, 0, 0.9, 0.035, 0.035); SG.add('iron', BOX, x + s * 0.02, y - 0.12, z, 0, 0, 0, 0.03, 0.3, 0.1);
+    SG.add('iron', CYL, x + s * 0.25, y - 0.12, z, 0, 0, s * 0.9, 0.01, 0.32, 0.01);
+    for (const dx of [0.3, 0.72]) SG.add('iron', CYL, x + s * dx, y - 0.07, z, 0, 0, 0, 0.007, 0.1, 0.007);
+    const bd = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.32, 0.035), new THREE.MeshStandardMaterial({ map: signTex(txt, bg, fg), roughness: 0.7 }));
+    bd.position.set(x + s * 0.51, y - 0.28, z); bd.rotation.y = s > 0 ? 0 : Math.PI; bd.castShadow = true; root.add(bd);
+  }
+  SG.build(root, mats);
+
+  // ── fiação aérea: ao longo das fachadas e cruzando a rua (fora de z ∈ [−8; 8]), com catenária ──
+  const pts = [];
+  const span = (a, b, sag, n = 12) => { for (let i = 0; i < n; i++) { const t0 = i / n, t1 = (i + 1) / n; for (const t of [t0, t1]) pts.push(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - sag * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t); } };
+  for (const [xw, dy] of [[RUA.houseW[1] + 0.06, 6.1], [RUA.houseE[0] - 0.06, 5.9]]) for (let z = -44; z < 44; z += 8) { if (z > -12 && z < 8) continue; span([xw + ruaX(z), ruaY(z) + dy, z], [xw + ruaX(z + 8), ruaY(z + 8) + dy, z + 8], 0.18, 8); }
+  for (const z of [-34, -19, 15, 31]) for (const dy of [0, 0.28]) span([RUA.houseW[1] + ruaX(z), ruaY(z) + 6.3 + dy, z], [RUA.houseE[0] + ruaX(z + 1.5), ruaY(z + 1.5) + 6.1 + dy, z + 1.5], 0.45 + dy * 0.5, 16);
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const wires = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: '#141414' })); wires.name = 'city_fios'; root.add(wires);
+
+  // ── roupas num varal sob uma janela do sobrado leste ──
+  const zc = -15.2, xc = RUA.houseE[0] + ruaX(zc) - 0.32, yc = ruaY(zc) + 5.45;
+  const VR = new Merger(); VR.add('iron', CYL, xc, yc, zc, Math.PI / 2, 0, 0, 0.006, 1.9, 0.006);
+  for (const dz of [-0.95, 0.95]) VR.add('iron', BOX, xc + 0.16, yc, zc + dz, 0, 0, 0, 0.32, 0.025, 0.025);
+  VR.build(root, mats);
+  const cm = new THREE.MeshStandardMaterial({ map: clothTex(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.95 });
+  const clothes = [];
+  [[0, 0.55, 0.6], [1, 0.62, 0.75], [2, 0.5, 0.78]].forEach(([k, w, h], i) => {
+    const g2 = new THREE.PlaneGeometry(w, h); g2.translate(0, -h / 2, 0); const uv = g2.attributes.uv; for (let j = 0; j < uv.count; j++) uv.setX(j, (k + uv.getX(j)) / 3);
+    const c = new THREE.Mesh(g2, cm); c.position.set(xc, yc, zc - 0.62 + i * 0.62); c.rotation.y = Math.PI / 2; c.castShadow = true; root.add(c); clothes.push(c);
+  });
+  out.update = (dt, t) => clothes.forEach((c, i) => { c.rotation.z = 0.06 * Math.sin(t * 1.3 + i * 1.7) + 0.03 * Math.sin(t * 3.1 + i); });
   return out;
 }
