@@ -25,12 +25,12 @@ export function paintMaps() {
   const [c, x] = cnv(N), img = x.createImageData(N, N), [c2, x2] = cnv(N), img2 = x2.createImageData(N, N);
   for (let y = 0; y < N; y++) for (let xx = 0; xx < N; xx++) {
     const i = y * N + xx, dx = h[y * N + ((xx + 1) % N)] - h[y * N + ((xx + N - 1) % N)], dy = h[((y + 1) % N) * N + xx] - h[((y + N - 1) % N) * N + xx];
-    const nx = -dx * 6, ny = -dy * 6, l = Math.hypot(nx, ny, 1);
+    const nx = -dx * 3, ny = -dy * 3, l = Math.hypot(nx, ny, 1);
     img.data[i * 4] = (nx / l * 0.5 + 0.5) * 255; img.data[i * 4 + 1] = (ny / l * 0.5 + 0.5) * 255; img.data[i * 4 + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[i * 4 + 3] = 255;
     const r = 150 + (b[i] - 0.5) * 60 + (a[i] - 0.5) * 30; img2.data[i * 4] = img2.data[i * 4 + 1] = img2.data[i * 4 + 2] = r; img2.data[i * 4 + 3] = 255;
   }
   x.putImageData(img, 0, 0); x2.putImageData(img2, 0, 0);
-  const normal = tex(c, false, true), rough = tex(c2, false, true); normal.repeat.set(3, 3); rough.repeat.set(3, 3);
+  const normal = tex(c, false, true), rough = tex(c2, false, true); normal.repeat.set(14, 14); rough.repeat.set(5, 5);
   return (_paint = { normal, rough });
 }
 

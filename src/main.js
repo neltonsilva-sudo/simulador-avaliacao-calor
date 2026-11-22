@@ -60,6 +60,8 @@ const app = {
   /** Troca de ambiente: módulos ouvem app.on('env') e mostram só o grupo ativo. */
   async setEnv(id, { view = true } = {}) {
     if (!ENVS[id] || id === state.env && app._envReady) return;
+    const flight = view && app._envReady && app.street && app.stage?.flyTo;
+    if (flight) await fadeTo(1, 0.35); // escurece o interior de origem antes de trocar
     state.env = id; app._envReady = true; const E = ENVS[id], C = CY.CYCLES[id];
     state.running = false; state.doorHold = false; if (field.doors.forno1 > 0) app.setDoor('forno1', false);
     anchors.presentDevice?.position.copy(V(E.PRESENT.device.pos)); if (anchors.presentDevice) anchors.presentDevice.rotation.y = E.PRESENT.device.rotY || 0;
@@ -71,17 +73,22 @@ const app = {
     const seg = C.segmentAt(state.clock + 25 * 60);
     app.worker?.setStation?.(seg.station || E.stations[1], { instant: true, act: seg.act || 'A2' });
     if (view) {
-      // voo pela rua: sai do prédio pelo alto, atravessa a rua entre os dois ambientes e entra no outro
-      const st = app.stage, rx = app.street?.roadX ?? 18.9, toCald = id === 'caldeiras';
-      if (st?.flyTo && app.street) {
-        const s0 = toCald ? 1 : -1; st.freeCam = true;
-        await st.flyTo({ pos: [rx - s0 * 9, 13, 16], target: [rx, 0.5, 0], fov: 55 }, 0.7);
-        st.setEnv?.('rua'); // perfil externo (sol, céu, exposição de dia) enquanto a câmera está na rua
-        await st.flyTo({ pos: [rx - s0 * 1.2, 6.5, -14], target: [rx, 6.5, 62], fov: 55 }, 1.5); // ladeira acima, igreja ao fundo
-        await st.flyTo({ pos: [rx + s0 * 4, 7, 15], target: [rx + s0 * 12, 2.5, -2], fov: 55 }, 1.3);
+      // voo pela rua colonial: corte (esmaecimento) para fora do prédio de origem, sobrevoo da rua ladeira acima,
+      // passagem por cima dos telhados do lado de destino e novo esmaecimento para dentro — sem atravessar paredes.
+      const st = app.stage, rx = app.street?.roadX ?? 18.9, toCald = id === 'caldeiras', s0 = toCald ? 1 : -1, dest = toCald ? 'c_overview' : 'overview';
+      if (flight) {
+        st.freeCam = true; st.setEnv?.('rua');
+        await st.flyTo({ pos: [rx - s0 * 7, 15, -26], target: [rx, 1.5, 6], fov: 55 }, 0);
+        await nextFrames(2); await fadeTo(0, 0.45);
+        await st.flyTo({ pos: [rx - s0 * 0.8, 3.2, -12], target: [rx, 5.5, 62], fov: 55 }, 1.6); // desce na rua, igreja ao fundo
+        await st.flyTo({ pos: [rx + s0 * 1.5, 4.5, 4], target: [rx + s0 * 4, 4.2, 30], fov: 55 }, 1.3); // segue pela rua
+        await st.flyTo({ pos: [rx + s0 * 5, 15.5, 2], target: [rx + s0 * 16, 2, 0], fov: 55 }, 1.2); // sobe acima dos telhados
+        await fadeTo(1, 0.35);
+        st.freeCam = false; st.setEnv?.(id); await st.setView?.(dest, { animate: false });
+        await nextFrames(2); await fadeTo(0, 0.5);
+      } else {
+        await st?.setView?.(dest, { duration: 1.6 });
       }
-      await st?.setView?.(toCald ? 'c_overview' : 'overview', { duration: 1.6 });
-      if (st) { st.freeCam = false; app.stage?.setEnv?.(id); } // reaplica luz/névoa/limites do ambiente de chegada
     }
     app.emit('change');
   },
@@ -138,6 +145,15 @@ const app = {
 };
 window.__sim = app;
 const anchors = {};
+// cortina para as transições entre ambientes (esmaecimento)
+let fadeEl = null;
+function fadeTo(o, dur) {
+  if (!fadeEl) { fadeEl = document.createElement('div'); Object.assign(fadeEl.style, { position: 'fixed', inset: '0', background: '#0b0d10', opacity: '0', pointerEvents: 'none', zIndex: '90', transition: 'opacity .3s ease' }); document.body.appendChild(fadeEl); }
+  fadeEl.style.transition = `opacity ${dur}s ease`; fadeEl.style.pointerEvents = o > 0 ? 'auto' : 'none';
+  requestAnimationFrame(() => (fadeEl.style.opacity = String(o)));
+  return new Promise((r) => setTimeout(r, dur * 1000 + 30));
+}
+const nextFrames = (n) => new Promise((r) => { const f = () => (--n <= 0 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
 const tmpP = new THREE.Vector3();
 
 function applyDoor() {

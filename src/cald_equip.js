@@ -178,7 +178,7 @@ export function buildEquipment(ctx) {
     sign('cat', V(cx + R * 0.86, cy + R * 0.52, zc + 0.6), V(0.86, 0.52, 0), 0.55, 0.42, `CALD-0${num}`);
     sign('quente', V(cx - 0.62, cy + 0.85, doorZ(0.95) + 0.03), V(0, 0.12, 1), 0.2);
     // ───── painel de comando (gabinete cinza com IHM) à esquerda da frente ─────
-    panel(ctx, V(cx - 1.95, 0, zf + 0.42), 0, `CALDEIRA ${num}`, num);
+    // painel de comando: construído por src/cald_panel.js (buildPanels, chamado em cald.js)
   }
 
   // ═════════════ BARRILETE DE INOX (sem isolamento) com pescoços de ganso sobre as caldeiras (FOTOS 1 e 5) ═════════════

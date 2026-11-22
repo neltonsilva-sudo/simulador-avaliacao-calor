@@ -12,6 +12,7 @@ import { buildBuilding, TRUSS_Y } from './cald_build.js';
 import { buildEquipment } from './cald_equip.js';
 import { buildProps } from './cald_props.js';
 import { createSteam } from './cald_steam.js';
+import { buildPanels } from './cald_panel.js';
 
 function makeMaterials(stage) {
   const aniso = Math.min(8, stage.renderer.capabilities.getMaxAnisotropy());
@@ -89,6 +90,7 @@ export function buildCaldeiras(stage, app) {
   buildBuilding(ctx);
   buildEquipment(ctx);
   buildProps(ctx);
+  const panels = buildPanels(stage, app, ctx); // painéis de comando das caldeiras (dono: PAINEL)
   // sujeira/AO assada nas cores de vértice
   const ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   const dirt = (p) => 0.74 + 0.26 * ss(0.0, 0.45, p.y);
@@ -137,6 +139,7 @@ export function buildCaldeiras(stage, app) {
   app.on('env', show); show(app.state.env);
 
   function update(dt, t) {
+    panels.update(dt, t);
     if (!group.visible) return;
     steam.update(dt, stage.camera);
     for (const e of steam.emitters) { const base = { purgador: 0.8, respiro: 0.6 }[e.id]; const lr = app.field?.leakRate?.[e.id]; if (base && lr != null) e.on = Math.max(0, Math.min(1.5, lr / base)); }
@@ -145,6 +148,6 @@ export function buildCaldeiras(stage, app) {
     for (const l of ctx.levels) { const y = Math.sin(t * 2.1 + l.seed) * 0.006 + Math.sin(t * 7.7 + l.seed) * 0.002; l.m.position.y = l.base + 0.15 + y; }
     if ((scrT -= dt) <= 0) { scrT = 1.0; drawScreens(t); }
   }
-  const api = { group, update, steam, ctx, valves: ctx.valves };
+  const api = { group, update, steam, ctx, valves: ctx.valves, panels };
   return api;
 }
