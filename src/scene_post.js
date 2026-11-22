@@ -440,7 +440,7 @@ vD = length(mvPosition.xyz); }`,
       let open = 0; try { open = app?.machines?.doorOpen?.(h.id) ?? app?.field?.doors?.[h.id] ?? 0; } catch { open = 0; }
       open = Math.max(0, Math.min(1, +open || 0)); h.p.x = open * h.k; h.open.x = open; anyHaze += h.p.x;
     }
-    A.hazeAmt.value = anyHaze > 0 ? 0.1 * (P.haze ?? 1) : 0; A.floorRefl.value = this.stage.env === 'caldeiras' ? 0 : (P.floorRefl ?? 1); A.roomOn.value = this.stage.env === 'caldeiras' ? 0 : (P.room ?? 1);
+    A.hazeAmt.value = anyHaze > 0 ? 0.1 * (P.haze ?? 1) : 0; A.floorRefl.value = this.stage.env === 'fornos' ? (P.floorRefl ?? 1) : 0; A.roomOn.value = this.stage.env === 'fornos' ? (P.room ?? 1) : 0;
     this.run(this.composeA, this.aRT);
     // 6) DOF
     const dof = this.stage._dof; const B = this.composeB.uniforms;

@@ -157,16 +157,15 @@ export function flange(batch, inst, matKey, nutMat, c, n, r, { thick = 0.03, bol
 export function wheelGeo(rw) {
   return cached('wheel' + rw, () => {
     const parts = [];
-    const t = new THREE.TorusGeometry(rw, rw * 0.09, 10, 40); t.rotateX(Math.PI / 2); parts.push(t);
-    for (let i = 0; i < 3; i++) { const s = new THREE.CylinderGeometry(rw * 0.05, rw * 0.05, rw * 2 * 0.95, 8); s.rotateZ(Math.PI / 2); s.rotateY((i / 3) * Math.PI); s.translate(0, -rw * 0.05, 0); parts.push(s); }
-    const h = new THREE.CylinderGeometry(rw * 0.16, rw * 0.18, rw * 0.3, 14); h.translate(0, -rw * 0.05, 0); parts.push(h);
-    // pega no aro
-    const k = new THREE.CylinderGeometry(rw * 0.07, rw * 0.07, rw * 0.35, 8); k.translate(rw * 0.98, rw * 0.17, 0); parts.push(k);
-    return mergeGeometries(parts.map((p) => p.toNonIndexed()));
+    const t = new THREE.TorusGeometry(rw, rw * 0.1, 10, 48); t.rotateX(Math.PI / 2); parts.push(t);
+    for (let i = 0; i < 5; i++) { const s = new THREE.CylinderGeometry(rw * 0.045, rw * 0.085, rw * 0.95, 8); s.translate(0, rw * 0.475, 0); s.rotateZ(Math.PI / 2); s.rotateY((i / 5) * Math.PI * 2); s.translate(0, -rw * 0.06, 0); parts.push(s); }
+    for (let i = 0; i < 10; i++) { const b = new THREE.SphereGeometry(rw * 0.12, 8, 6); b.scale(1, 0.85, 1); const a = (i / 10) * Math.PI * 2 + 0.3; b.translate(Math.cos(a) * rw, 0, Math.sin(a) * rw); parts.push(b); }
+    const h = new THREE.CylinderGeometry(rw * 0.17, rw * 0.21, rw * 0.32, 16); h.translate(0, -rw * 0.06, 0); parts.push(h);
+    return mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)));
   });
 }
 /** válvula globo/gaveta em linha: corpo + castelo + haste + volante. axis = direção do tubo, up = direção do castelo */
-export function valve(batch, inst, M, c, axis, up, r, { wheel = 'red', size = 1, gate = false } = {}) {
+export function valve(batch, inst, M, c, axis, up, r, { wheel = 'red', size = 1, gate = false, live = null } = {}) {
   const a = axis.clone().normalize(), u = up.clone().normalize();
   const k = size, rb = r * 1.6;
   // corpo esférico achatado
@@ -185,11 +184,23 @@ export function valve(batch, inst, M, c, axis, up, r, { wheel = 'red', size = 1,
   // gaxeta (prensa-gaxeta) e haste
   const top = c.clone().addScaledVector(u, rb * 0.9 + bh);
   batch.add('steelDark', bfl, alignY(top.clone().addScaledVector(u, 0.012), u, [rb * 0.55, 0.035, rb * 0.55]));
-  const stemL = r * 1.6 + 0.08;
-  batch.add('chrome', cached('stem', () => new THREE.CylinderGeometry(1, 1, 1, 10)), alignY(top.clone().addScaledVector(u, stemL / 2), u, [Math.max(0.008, r * 0.12), stemL, Math.max(0.008, r * 0.12)]));
+  const stemL = r * 1.6 + 0.08, sr = Math.max(0.008, r * 0.12);
+  // prensa-gaxeta com 2 prisioneiros + haste rosqueada (anéis de rosca) + arcada (yoke) nas válvulas de gaveta
+  const gp = top.clone().addScaledVector(u, 0.03), side = new THREE.Vector3().crossVectors(u, Math.abs(u.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
+  batch.add('steelDark', cached('glandPlate', () => new THREE.BoxGeometry(1, 1, 1)), new THREE.Matrix4().compose(gp, new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u), new THREE.Vector3(rb * 1.5, 0.014, rb * 0.5)));
+  for (const sg of [-1, 1]) inst.add('nut', hexGeo(), M.nut, alignY(gp.clone().addScaledVector(side, sg * rb * 0.6).addScaledVector(u, 0.012), u, [0.018, 0.016, 0.018]));
+  if (gate) for (const sg of [-1, 1]) batch.add('cast', cached('yoke', () => new THREE.BoxGeometry(1, 1, 1)), new THREE.Matrix4().compose(top.clone().addScaledVector(side, sg * rb * 0.45).addScaledVector(u, stemL * 0.45), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), u), new THREE.Vector3(0.02, stemL * 0.9, 0.03)));
+  batch.add('chrome', cached('stem', () => new THREE.CylinderGeometry(1, 1, 1, 10)), alignY(top.clone().addScaledVector(u, stemL / 2), u, [sr, stemL, sr]));
+  const nTh = Math.max(4, Math.round(stemL / 0.012));
+  for (let i = 0; i < nTh; i++) batch.add('steelDark', cached('thread', () => new THREE.TorusGeometry(1, 0.18, 4, 12).rotateX(Math.PI / 2)), alignY(top.clone().addScaledVector(u, 0.04 + (stemL - 0.06) * i / nTh), u, [sr * 1.05, sr, sr * 1.05]));
   // volante
-  const rw = Math.max(0.09, r * 2.3) * k;
-  batch.add(wheel === 'blue' ? 'wheelBlue' : 'wheelRed', wheelGeo(1), alignY(top.clone().addScaledVector(u, stemL), u, [rw, rw, rw]));
+  const rw = Math.max(0.09, r * 2.3) * k, wp = top.clone().addScaledVector(u, stemL);
+  if (live) {
+    const g = new THREE.Group(); g.name = 'volante:' + live.id; g.position.copy(wp); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), u); g.userData.axis = u.clone();
+    const m = new THREE.Mesh(wheelGeo(1), wheel === 'blue' ? M.wheelBlueI : M.wheelRedI); m.scale.setScalar(rw); m.castShadow = true; g.add(m);
+    const nut = new THREE.Mesh(hexGeo(), M.nut); nut.scale.set(sr * 3, 0.02, sr * 3); nut.position.y = rw * 0.12; g.add(nut);
+    live.group.add(g); live.list.push({ id: live.id, group: g, axis: u.clone(), pos: wp.clone(), kind: live.kind, ...(live.leak ? { leak: live.leak } : {}) });
+  } else batch.add(wheel === 'blue' ? 'wheelBlue' : 'wheelRed', wheelGeo(1), alignY(wp, u, [rw, rw, rw]));
   return { top, gland: top.clone().addScaledVector(u, 0.012) };
 }
 /** manômetro: caixa + aro + face (material próprio) + vidro; ponteiro devolvido para animação. n = normal da face */

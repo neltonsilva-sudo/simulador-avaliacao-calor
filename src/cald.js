@@ -16,13 +16,13 @@ import { createSteam } from './cald_steam.js';
 function makeMaterials(stage) {
   const aniso = Math.min(8, stage.renderer.capabilities.getMaxAnisotropy());
   const clad = TX.cladTextures(), st = TX.steelTextures(), pt = TX.paintTextures(), wl = TX.wallTextures(), rf = TX.roofTextures(), fd = TX.floorDetail(), fm = TX.floorMacro();
-  for (const t of [clad, st, pt, wl, rf, fd]) for (const k of Object.keys(t)) t[k].anisotropy = aniso;
+  for (const t of [clad, st, pt, wl, rf, fd, TX.spunTextures()]) for (const k of Object.keys(t)) t[k].anisotropy = Math.max(aniso, Math.min(16, stage.renderer.capabilities.getMaxAnisotropy()));
   const N = (s) => new THREE.Vector2(s, s);
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, ...o });
   const paint = (color, rough = 1, o = {}) => std({ color, roughness: rough, roughnessMap: pt.rough, map: pt.map, normalMap: pt.normal, normalScale: N(0.35), metalness: 0.05, ...o });
   const M = {
     clad: std({ color: 0xe8ebee, metalness: 1, roughness: 1.0, map: clad.map, roughnessMap: clad.rough, normalMap: clad.normal, normalScale: N(0.28) }),
-    door: std({ color: 0xf2f0ec, metalness: 1, roughness: 1.35, map: TX.spunTextures().map, roughnessMap: TX.spunTextures().rough, normalMap: TX.spunTextures().normal, normalScale: N(0.18) }),
+    door: std({ color: 0xf2f0ec, metalness: 1, roughness: 1.35, map: TX.spunTextures().map, roughnessMap: TX.spunTextures().rough, normalMap: TX.spunTextures().normal, normalScale: N(0.1) }),
     steelHot: std({ color: 0xcfccc6, metalness: 1, roughness: 0.95, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.35) }),
     steel: std({ color: 0xc8cacc, metalness: 1, roughness: 0.75, map: st.map, roughnessMap: st.rough, normalMap: st.normal, normalScale: N(0.3) }),
     steelDark: std({ color: 0x7d8186, metalness: 0.9, roughness: 0.42 }),
@@ -85,7 +85,7 @@ export function buildCaldeiras(stage, app) {
   const group = new THREE.Group(); group.name = 'caldeiras';
   group.visible = app.state.env === 'caldeiras'; stage.scene.add(group);
   const M = makeMaterials(stage);
-  const ctx = { group, batch: new G.Batch(), inst: new G.Inst(), M, TRUSS_Y, needles: [], flames: [], screens: [], levels: [], emitters: {} };
+  const ctx = { group, batch: new G.Batch(), inst: new G.Inst(), M, TRUSS_Y, needles: [], flames: [], screens: [], levels: [], emitters: {}, valves: [] };
   buildBuilding(ctx);
   buildEquipment(ctx);
   buildProps(ctx);
@@ -139,10 +139,12 @@ export function buildCaldeiras(stage, app) {
   function update(dt, t) {
     if (!group.visible) return;
     steam.update(dt, stage.camera);
-    for (const f of ctx.flames) { const k = 0.75 + 0.25 * Math.sin(t * 23 + f.seed) * Math.sin(t * 7.3 + f.seed * 2) + 0.1 * Math.sin(t * 51 + f.seed); f.m.material.color.setRGB(6 * k * f.k, 3.1 * k * f.k, 1.1 * k * f.k); f.m.material.map.offset.set(Math.sin(t * 3 + f.seed) * 0.03, t * 0.4 % 1); }
+    for (const e of steam.emitters) { const base = { purgador: 0.8, respiro: 0.6 }[e.id]; const lr = app.field?.leakRate?.[e.id]; if (base && lr != null) e.on = Math.max(0, Math.min(1.5, lr / base)); }
+    for (const f of ctx.flames) { const on = app.boiler ? app.boiler(f.id)?.on !== false : true; if (!on) { f.m.material.color.setRGB(0.02, 0.015, 0.01); continue; } const k = 0.75 + 0.25 * Math.sin(t * 23 + f.seed) * Math.sin(t * 7.3 + f.seed * 2) + 0.1 * Math.sin(t * 51 + f.seed); f.m.material.color.setRGB(6 * k * f.k, 3.1 * k * f.k, 1.1 * k * f.k); f.m.material.map.offset.set(Math.sin(t * 3 + f.seed) * 0.03, t * 0.4 % 1); }
     for (const n of ctx.needles) { const v = n.v + Math.sin(t * 1.7 + n.seed) * n.jit + Math.sin(t * 13 + n.seed * 3) * n.jit * 0.3; n.n.rotation.z = n.ang(v) - Math.PI / 2; }
     for (const l of ctx.levels) { const y = Math.sin(t * 2.1 + l.seed) * 0.006 + Math.sin(t * 7.7 + l.seed) * 0.002; l.m.position.y = l.base + 0.15 + y; }
     if ((scrT -= dt) <= 0) { scrT = 1.0; drawScreens(t); }
   }
-  return { group, update, steam, ctx };
+  const api = { group, update, steam, ctx, valves: ctx.valves };
+  return api;
 }

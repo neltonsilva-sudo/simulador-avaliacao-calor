@@ -53,7 +53,7 @@ export function buildEquipment(ctx) {
     const vp = V(cx + 0.62, cy + 0.42, doorZ(0.75));
     cyl('steelDark', vp.clone().add(V(0, 0, -0.02)), vp.clone().add(V(0, 0, 0.09)), 0.055, 18);
     G.boltCircle(inst, M.nut, vp.clone().add(V(0, 0, 0.09)), Z, 0.05, 4, 0.016, 0.012);
-    const fm = new THREE.Mesh(G.cached('vpDisc', () => new THREE.CircleGeometry(0.036, 20)), M.flame.clone()); fm.position.copy(vp).add(V(0, 0, 0.0915)); group.add(fm); flames.push({ m: fm, k: 1, seed: num * 3.1 });
+    const fm = new THREE.Mesh(G.cached('vpDisc', () => new THREE.CircleGeometry(0.036, 20)), M.flame.clone()); fm.position.copy(vp).add(V(0, 0, 0.0915)); group.add(fm); flames.push({ m: fm, k: 1, seed: num * 3.1, id: b.id });
     // ───── queimador monobloco (centro da fornalha, abaixo do eixo) ─────
     const by = cy - 0.36, zB = doorZ(0.0) - 0.02;
     box('steelDark', [cx, by, zB + 0.03], [0.62, 0.62, 0.05]);
@@ -68,12 +68,23 @@ export function buildEquipment(ctx) {
     cyl('motor', V(mx, by + 0.05, zB + 0.24), V(mx + 0.3, by + 0.05, zB + 0.24), 0.105, 24);
     for (let k = 0; k < 7; k++) cyl('motor', V(mx + 0.04 + k * 0.035, by + 0.05, zB + 0.24), V(mx + 0.052 + k * 0.035, by + 0.05, zB + 0.24), 0.118, 24);
     cyl('motorDark', V(mx + 0.3, by + 0.05, zB + 0.24), V(mx + 0.34, by + 0.05, zB + 0.24), 0.09, 20);
-    box('motor', [mx + 0.14, by + 0.18, zB + 0.24], [0.1, 0.07, 0.1]);
+    box('motor', [mx + 0.14, by + 0.18, zB + 0.24], [0.1, 0.07, 0.1]); cyl('rubber', V(mx + 0.14, by + 0.215, zB + 0.24), V(mx + 0.14, by + 0.26, zB + 0.24), 0.014, 8);
+    for (let k = 0; k < 18; k++) { const a = (k / 18) * Math.PI * 2; if (Math.abs(a - Math.PI / 2) < 0.4) continue; box('motor', [mx + 0.15, by + 0.05 + Math.sin(a) * 0.118, zB + 0.24 + Math.cos(a) * 0.118], [0.26, 0.006, 0.022], [a, 0, 0]); }
+    for (const sx of [0.03, 0.27]) box('motorDark', [mx + sx, by - 0.08, zB + 0.24], [0.04, 0.05, 0.22]);
+    // flange de montagem da carcaça (anel com parafusos) e caixa de ar com venezianas (lado −x)
+    cyl('burner', V(cx, by, zB + 0.06), V(cx, by, zB + 0.1), 0.33, 40); G.boltCircle(inst, M.nut, V(cx, by, zB + 0.1), Z, 0.31, 12, 0.022, 0.018);
+    box('burner', [cx - 0.36, by - 0.02, zB + 0.24], [0.16, 0.36, 0.28]);
+    for (let k = 0; k < 7; k++) box('motorDark', [cx - 0.445, by - 0.17 + k * 0.05, zB + 0.24], [0.012, 0.022, 0.24], [0, 0, 0.5]);
+    // cabos/eletroduto flexível do queimador ao painel
+    pipe('rubber', [V(cx + 0.12, by + 0.36, zB + 0.16), V(cx + 0.12, 2.35, zB + 0.16), V(cx - 1.95, 2.35, zB + 0.16), V(cx - 1.95, 2.35, zf + 0.42), V(cx - 1.95, 1.95, zf + 0.42)], 0.016, 0.1);
+    pipe('rubber', [V(mx + 0.14, by + 0.26, zB + 0.24), V(mx + 0.14, by + 0.45, zB + 0.3), V(cx + 0.14, by + 0.45, zB + 0.3)], 0.01, 0.06);
+    // manômetro de gás no trem de gás
+    { const gpg = G.gauge(group, batch, M, TX.gaugeFace({ max: 400, red: 300, unit: 'mbar' }).tex, V(cx - 0.62 + 0.09, 1.78, zf + 0.22 + 0.04), Z, 0.04, [V(cx - 0.62 + 0.09, 1.72, zf + 0.22), V(cx - 0.62, 1.72, zf + 0.22)]); needles.push({ n: gpg.needle, ang: (v) => -(Math.PI * 0.75 + Math.PI * 1.5 * v / 400), v: 180, jit: 2, seed: num * 2.2 }); }
     // servomotor do registro de ar + transformador de ignição + programador (caixa preta)
     box('rubber', [cx - 0.1, by + 0.33, zB + 0.2], [0.14, 0.09, 0.1]); box('burnerCover', [cx + 0.12, by + 0.32, zB + 0.16], [0.12, 0.07, 0.14]);
     // visor de chama do queimador (traseira da carcaça)
     const sv = V(cx - 0.14, by + 0.1, zB + 0.505); cyl('chrome', sv.clone().add(V(0, 0, -0.04)), sv, 0.03, 16);
-    const f2 = new THREE.Mesh(G.cached('svDisc', () => new THREE.CircleGeometry(0.022, 16)), M.flame.clone()); f2.position.copy(sv).add(V(0, 0, 0.002)); group.add(f2); flames.push({ m: f2, k: 1.3, seed: num * 5.7 });
+    const f2 = new THREE.Mesh(G.cached('svDisc', () => new THREE.CircleGeometry(0.022, 16)), M.flame.clone()); f2.position.copy(sv).add(V(0, 0, 0.002)); group.add(f2); flames.push({ m: f2, k: 1.3, seed: num * 5.7, id: b.id });
     // ───── trem de gás (amarelo) — desce da rede aérea e entra por baixo do queimador ─────
     const gx = cx - 0.62, gz = zf + 0.22;
     pipe('gasYellow', [V(gx, 3.6, gz), V(gx, 0.95, gz), V(cx - 0.12, 0.95, gz), V(cx - 0.12, by - 0.29, gz)], 0.028, 0.07);
@@ -226,11 +237,12 @@ export function buildEquipment(ctx) {
   for (const x of [38.0, 40.5, 44.5, 47.0, 49.0]) { cyl('steelDark', V(x, ay + aer.R + 0.03, az), V(x, ctx.TRUSS_Y, az), 0.012, 8); batch.add('steelDark', G.cached('clamp' + aer.R, () => new THREE.TorusGeometry(aer.R + 0.03, 0.012, 6, 28)), G.mat4([x, ay, az], [0, Math.PI / 2, 0])); }
   // descida nua ao coletor com válvula de bloqueio
   pipe('steelHot', [V(xD, 2.75, col.c[2]), V(xD, col.c[1] + col.R, col.c[2])], 0.1);
-  G.valve(batch, inst, M, V(xD, 2.28, col.c[2]), Y, Z, 0.1, { wheel: 'red', size: 1.4, gate: true });
+  G.valve(batch, inst, M, V(xD, 2.28, col.c[2]), Y, Z, 0.1, { wheel: 'red', size: 1.4, gate: true, live: { group, list: ctx.valves, id: 'V-01', kind: 'gaveta' } });
 
   // ═════════════ COLETOR / DISTRIBUIDOR DE VAPOR ═════════════
   const [kx, ky, kz] = col.c, kx0 = kx - col.L / 2 + 0.1, kx1 = kx + col.L / 2 - 0.1;
   batch.add('steelHot', G.shellGeo(col.R, kx1 - kx0, { top: 'ell', bot: 'ell', seg: 40, sheetW: 0.6, sheetL: 1.0 }), G.mat4([kx, ky, kz], [0, 0, -Math.PI / 2]));
+  for (const x of [kx0 + 0.25, 45.6, 47.9, 50.2, kx1 - 0.25]) batch.add('weld', G.cached('cWeld', () => new THREE.TorusGeometry(0.162, 0.006, 6, 40)), G.mat4([x, ky, kz], [0, Math.PI / 2, 0]));
   // suportes (coluna + berço + abraçadeira U)
   for (const x of [44.4, 47.4, 50.7]) {
     cyl('paintBlue', V(x, 0.1, kz), V(x, ky - col.R - 0.02, kz), 0.06, 16); box('paintBlue', [x, ky - col.R - 0.03, kz], [0.12, 0.04, 0.36]);
@@ -243,7 +255,7 @@ export function buildEquipment(ctx) {
   outs.forEach(([x, r, yr], i) => {
     pipe('steelHot', [V(x, ky, kz), V(x, ky + col.R + 0.28, kz), V(x, ky + col.R + 0.28, wz), V(x, yr, wz), V(i === 2 ? x + 0.6 : x - 0.6, yr, wz)], r, 0.18);
     G.flange(batch, inst, 'steelHot', M.nut, V(x, ky + col.R + 0.08, kz), Y, r, { bolts: 6 });
-    G.valve(batch, inst, M, V(x, ky + col.R + 0.28, -8.88), Z.clone().negate(), Y, r, { wheel: i === 1 ? 'blue' : 'red', size: 1.2 });
+    G.valve(batch, inst, M, V(x, ky + col.R + 0.28, -8.88), Z.clone().negate(), Y, r, { wheel: i === 1 ? 'blue' : 'red', size: 1.2, gate: true, live: { group, list: ctx.valves, id: `V-0${i + 2}`, kind: 'gaveta' } });
   });
   // linhas ao longo da parede do fundo (para os processos) — y 4,4 / 5,0 / 4,7
   pipe('clad', [V(44.3, 4.4, wz), V(31.0, 4.4, wz), V(31.0, 4.4, -6.0), V(30.2, 4.4, -6.0)], 0.1, 0.3);
@@ -258,7 +270,7 @@ export function buildEquipment(ctx) {
   const lx = lk.pos[0], rz = kz + col.R + 0.22;
   pipe('steelHot', [V(lx, ky, kz), V(lx, ky, rz), V(lx, 3.05, rz), V(lx, 3.05, wz), V(lx, 3.6, wz)], 0.06, 0.16);
   G.flange(batch, inst, 'steelHot', M.nut, V(lx, ky, kz + col.R + 0.06), Z, 0.06, { bolts: 6 });
-  const lv = G.valve(batch, inst, M, V(lx, 1.98, rz), Y, Z, 0.06, { wheel: 'red', size: 1.25 });
+  const lv = G.valve(batch, inst, M, V(lx, 1.98, rz), Y, Z, 0.06, { wheel: 'red', size: 1.25, live: { group, list: ctx.valves, id: 'V-07', kind: 'globo', leak: 'purgador' } });
   ctx.emitters.purgador = { pos: lv.gland.clone(), dir: V(0.55, 0.35, 0.75).normalize() };
   // manômetro do coletor
   cyl('steelHot', V(45.6, ky + col.R - 0.02, kz), V(45.6, ky + col.R + 0.22, kz), 0.015, 10);
@@ -271,7 +283,7 @@ export function buildEquipment(ctx) {
   const px = 49.4;
   pipe('steelHot', [V(px, ky - col.R + 0.02, kz), V(px, 0.62, kz), V(px, 0.62, kz - 0.3), V(px, 0.32, kz - 0.3), V(px, 0.32, -8.84), V(px, 0.06, -8.84)], 0.03, 0.08);
   batch.add('cast', G.cached('trap', () => new THREE.CylinderGeometry(0.06, 0.06, 0.09, 6)), G.mat4([px, 0.62, kz - 0.15], [Math.PI / 2, 0, 0]));
-  G.valve(batch, inst, M, V(px, 1.0, kz), Y, Z, 0.025, { wheel: 'red' });
+  G.valve(batch, inst, M, V(px, 1.0, kz), Y, Z, 0.025, { wheel: 'red', live: { group, list: ctx.valves, id: 'V-PURGA', kind: 'purga' } });
   ctx.emitters.dreno = { pos: V(px, 0.08, -8.84), dir: Y.clone() };
   // gaxeta (anel escurecido de umidade) já feita pelo prensa-gaxeta da válvula
 

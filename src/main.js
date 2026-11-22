@@ -70,7 +70,19 @@ const app = {
     sensors.soak(E.ta0 - 0.5);
     const seg = C.segmentAt(state.clock + 25 * 60);
     app.worker?.setStation?.(seg.station || E.stations[1], { instant: true, act: seg.act || 'A2' });
-    if (view) app.stage?.setView?.(id === 'fornos' ? 'overview' : 'c_overview');
+    if (view) {
+      // voo pela rua: sai do prédio pelo alto, atravessa a rua entre os dois ambientes e entra no outro
+      const st = app.stage, rx = app.street?.roadX ?? 18.9, toCald = id === 'caldeiras';
+      if (st?.flyTo && app.street) {
+        const s0 = toCald ? 1 : -1; st.freeCam = true;
+        await st.flyTo({ pos: [rx - s0 * 9, 13, 16], target: [rx, 0.5, 0], fov: 55 }, 0.7);
+        st.setEnv?.('rua'); // perfil externo (sol, céu, exposição de dia) enquanto a câmera está na rua
+        await st.flyTo({ pos: [rx - s0 * 1.2, 6.5, -14], target: [rx, 6.5, 62], fov: 55 }, 1.5); // ladeira acima, igreja ao fundo
+        await st.flyTo({ pos: [rx + s0 * 4, 7, 15], target: [rx + s0 * 12, 2.5, -2], fov: 55 }, 1.3);
+      }
+      await st?.setView?.(toCald ? 'c_overview' : 'overview', { duration: 1.6 });
+      if (st) { st.freeCam = false; app.stage?.setEnv?.(id); } // reaplica luz/névoa/limites do ambiente de chegada
+    }
     app.emit('change');
   },
   stage: null, hall: null, machines: null, worker: null, meter: null, kit: null, fw: null, audio: null, ui: null,
@@ -91,6 +103,11 @@ const app = {
   /** Painéis dos fornos: setpoint (SV) e liga/desliga; a temperatura real (PV) evolui em stepOvens. */
   setOvenSetpoint(id, v) { field.setSetpoint(id, v); app.emit('oven', { id }); app.emit('change'); },
   setOvenOn(id, b) { field.setOven(id, b); app.machines?.setOven?.(id, b); app.emit('oven', { id }); app.emit('change'); },
+  /** Caldeiras (painel): liga/desliga e carga do queimador 0..1; a física (costado/tampo/ar) acompanha com ~8 min. */
+  setBoiler(id, o) { field.setBoiler(id, o); app.emit('boiler', { id, ...field.boil[id] }); app.emit('change'); },
+  boiler: (id) => ({ id, ...field.boil[id] }),
+  /** Válvulas/vazamentos: taxa 0..1 (0 = fechado/estancado) — muda vapor visível e a umidade/calor local. */
+  setLeak(id, rate) { field.setLeak(id, rate); app.emit('leak', { id, rate: field.leakRate[id] }); app.emit('change'); },
   oven: (id) => ({ id, pv: field.pv[id], sp: field.sp[id], on: field.on[id] !== false, label: OVENS.find((o) => o.id === id)?.label }),
   holdDoor(b) { state.doorHold = !!b; applyDoor(); app.emit('change'); },
   setWater(v) { state.water = v; app.meter?.setWater?.(v); app.emit('change'); },
@@ -216,6 +233,10 @@ function getInput() {
   bootStep(74, 'Acendendo as caldeiras…');
   const caldM = await load('./cald.js');
   app.cald = await safe('cald', () => caldM?.buildCaldeiras?.(stage, app));
+  const vlM = await load('./cald_valves.js'); app.valves = await safe('valves', () => vlM?.createValves?.(app));
+  const stM = await load('./street.js'); app.street = await safe('street', () => stM?.buildStreet?.(stage, app));
+  const shM = await load('./street_houses.js'); app.streetHouses = await safe('street_houses', () => shM?.buildColonialHouses?.(stage, app));
+  const scM = await load('./street_city.js'); app.streetCity = await safe('street_city', () => scM?.buildCity?.(stage, app));
   const propsM = await load('./props.js');
   bootStep(78, 'Detalhes da sala…');
   app.props = await safe('props', () => propsM?.buildProps?.(stage, app));
@@ -227,7 +248,7 @@ function getInput() {
   stage.onFrame((dt, t) => {
     stepSimulation(dt);
     app.machines?.update?.(dt, t); app.worker?.update?.(dt, t); app.fw?.update?.(dt);
-    app.meter?.update?.(dt, t); app.kit?.update?.(dt, t); app.hall?.update?.(dt, t); app.props?.update?.(dt, t); app.cald?.update?.(dt, t); app.audio?.update?.(dt, t);
+    app.meter?.update?.(dt, t); app.kit?.update?.(dt, t); app.hall?.update?.(dt, t); app.props?.update?.(dt, t); app.cald?.update?.(dt, t); app.streetHouses?.update?.(dt, t); app.streetCity?.update?.(dt, t); app.audio?.update?.(dt, t);
   });
 
   bootStep(94, 'Quase pronto…');

@@ -476,7 +476,7 @@ let _spun = null;
 export function spunTextures() {
   if (_spun) return _spun;
   const N = 512, r = rng(501), ring = new Float32Array(2048);
-  for (const [cells, amp] of [[520, 0.45], [180, 0.3], [40, 0.25]]) { const lat = Array.from({ length: cells + 1 }, () => r()); for (let i = 0; i < 2048; i++) { const f = (i * cells) / 2048, k = Math.floor(f), t = f - k, s2 = t * t * (3 - 2 * t); ring[i] += (lat[k] * (1 - s2) + lat[k + 1] * s2) * amp; } }
+  for (const [cells, amp] of [[110, 0.35], [36, 0.3], [12, 0.25]]) { const lat = Array.from({ length: cells + 1 }, () => r()); for (let i = 0; i < 2048; i++) { const f = (i * cells) / 2048, k = Math.floor(f), t = f - k, s2 = t * t * (3 - 2 * t); ring[i] += (lat[k] * (1 - s2) + lat[k + 1] * s2) * amp; } }
   const blot = fbm(N, N, 4, 4, 5, 503), h = new Float32Array(N * N);
   const [fc, fx] = cnv(N); fx.fillStyle = '#000'; fx.fillRect(0, 0, N, N); fx.lineCap = 'round';
   for (let k = 0; k < 140; k++) { const x = r() * N, y = r() * N, L = 10 + r() * 80, a = r() * Math.PI; fx.strokeStyle = `rgba(255,255,255,${0.1 + r() * 0.3})`; fx.lineWidth = 0.6 + r(); fx.beginPath(); fx.moveTo(x, y); fx.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L); fx.stroke(); }
@@ -489,7 +489,7 @@ export function spunTextures() {
   const [nc, nx] = cnv(N), img = nx.createImageData(N, N), d = img.data;
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const i = y * N + x, dx = x - N / 2, dy = y - N / 2, rr = Math.hypot(dx, dy) || 1, k = Math.min(2046, ((rr / (N / 2)) * 2047) | 0);
-    const g = (ring[k + 1] - ring[Math.max(0, k - 1)]) * 2.0; const ux = dx / rr, uy = dy / rr;
+    const g = (ring[Math.min(2047, k + 4)] - ring[Math.max(0, k - 4)]) * 1.2; const ux = dx / rr, uy = dy / rr;
     let ax = -g * ux, ay = g * uy, az = 1; const l = Math.hypot(ax, ay, az); d[i * 4] = (ax / l * 0.5 + 0.5) * 255; d[i * 4 + 1] = (ay / l * 0.5 + 0.5) * 255; d[i * 4 + 2] = (az / l * 0.5 + 0.5) * 255; d[i * 4 + 3] = 255;
   }
   nx.putImageData(img, 0, 0);

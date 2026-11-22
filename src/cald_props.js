@@ -229,8 +229,8 @@ export function buildProps(ctx) {
     for (const [px, pz] of [[37.3, 8.9], [38.5, 8.9]]) { box('wood', [px, 0.07, pz], [1.15, 0.14, 0.95]); }
     for (const [dx, dz, k] of [[37.0, 8.65, 'drumBlue'], [37.6, 8.65, 'drumBlue'], [37.0, 9.2, 'drumBlack'], [37.6, 9.2, 'drumBlue']]) { cyl(k, V(dx, 0.14, dz), V(dx, 1.02, dz), 0.28, 24); for (const y of [0.43, 0.72]) cyl(k, V(dx, y - 0.01, dz), V(dx, y + 0.01, dz), 0.287, 24); }
     for (let k = 0; k < 6; k++) box('sack', [38.25 + (k % 2) * 0.55, 0.22 + Math.floor(k / 2) * 0.13, 8.9], [0.52, 0.13, 0.85], [0, (k % 3) * 0.04, 0]);
-    for (let k = 0; k < 5; k++) batch.add('rubber', G.cached('hoseC' + k, () => new THREE.TorusGeometry(0.3 + k * 0.035, 0.022, 8, 40)), G.mat4([46.0, 0.025 + k * 0.012, -5.9], [Math.PI / 2, 0, 0]));
-    ctx.pipe('rubber', [V(46.32, 0.03, -5.9), V(46.9, 0.03, -6.3), V(47.3, 0.03, -7.6), V(47.45, 0.4, -8.2)], 0.022, 0.3);
+    for (let k = 0; k < 5; k++) batch.add('rubber', G.cached('hoseC' + k, () => new THREE.TorusGeometry(0.3 + k * 0.035, 0.022, 8, 40)), G.mat4([44.3, 0.025 + k * 0.012, -6.6], [Math.PI / 2, 0, 0]));
+    ctx.pipe('rubber', [V(44.62, 0.03, -6.6), V(44.62, 0.03, -7.9), V(44.4, 0.3, -8.25)], 0.022, 0.2);
     for (let k = 0; k < 4; k++) batch.add('wheelRed', G.cached('hoseR' + k, () => new THREE.TorusGeometry(0.22 + k * 0.03, 0.02, 8, 36)), G.mat4([30.18, 1.6, -1.2], [0, Math.PI / 2, 0]));
   }
 }

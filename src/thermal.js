@@ -41,14 +41,20 @@ export function createHeatField() {
   const heatK = (o) => Math.max(0, (pv[o.id] - AMB.wallT) / (o.setpoint - AMB.wallT)); // 1 = condição de projeto
   let fanOn = true;
 
+  // caldeiras: on (queimador ligado), load (carga 0..1), heat (fator térmico 0..1,1, 1ª ordem ~8 min) — escalam tampo, costado
+  // e o ar em volta; vazamentos: leakRate[id] (0 = válvula/gaxeta fechada) — escalam umidade e calor locais.
+  const boil = Object.fromEntries(BOILERS.filter((b) => b.kind === 'flamotubular').map((b) => [b.id, { on: true, load: 0.75, heat: 1 }]));
+  const leakRate = Object.fromEntries(LEAKS.map((l) => [l.id, l.rate]));
+  const boilK = (id) => (boil[id] ? boil[id].heat : 1);
   function inControl(p) { const C = CONTROL_ROOM; return p.x > C.x0 && p.x < C.x1 && p.z > C.z0 && p.z < C.z1; }
   function radiant2(p) { // casa de caldeiras
     if (inControl(p)) return { tr: CONTROL_ROOM.ta + 1.2, F: 0, parts: [] };
     let sumF = 0, sum4 = 0; const parts = [];
+    const amb = AMB2.wallT;
     for (const b of [...BOILERS, ...PIPES]) {
-      const T = (b.shellT ?? b.T) + K; const r = cylF(p, b);
+      const hk = boilK(b.id), Ts = (b.shellT ?? b.T), T = amb + (Ts - amb) * hk + K; const r = cylF(p, b);
       sumF += r.F; sum4 += r.F * T ** 4; parts.push({ id: b.id, F: r.F });
-      for (const e of r.ends) { const Te = (b.front && e.side === b.front.side ? b.front.T : (b.shellT ?? b.T)) + K; sumF += e.F; sum4 += e.F * Te ** 4; parts.push({ id: b.id + ':tampo', F: e.F }); }
+      for (const e of r.ends) { const T0 = (b.front && e.side === b.front.side ? b.front.T : Ts); const Te = amb + (T0 - amb) * hk + K; sumF += e.F; sum4 += e.F * Te ** 4; parts.push({ id: b.id + ':tampo', F: e.F }); }
     }
     const tr4 = sum4 + (1 - sumF) * (AMB2.wallT + K) ** 4;
     return { tr: tr4 ** 0.25 - K, F: sumF, parts };
@@ -59,9 +65,9 @@ export function createHeatField() {
     for (const b of BOILERS) { const r = Math.max(0, Math.hypot(p.x - b.c[0], p.z - b.c[2]) - (b.axis === 'y' ? b.R : b.R + (b.axis === 'z' ? 0 : 0)));
       const ext = b.axis === 'y' ? 0 : b.L / 2; const ax = b.axis === 'z' ? Math.abs(p.z - b.c[2]) : b.axis === 'x' ? Math.abs(p.x - b.c[0]) : 0;
       const rr = b.axis === 'z' ? Math.hypot(Math.max(0, Math.abs(p.x - b.c[0]) - b.R), Math.max(0, ax - ext)) : b.axis === 'x' ? Math.hypot(Math.max(0, Math.abs(p.z - b.c[2]) - b.R), Math.max(0, ax - ext)) : r;
-      ta += 2.6 * Math.exp(-rr / 2.2); }
-    for (const l of LEAKS) { const r = Math.hypot(p.x - l.pos[0], p.y - l.pos[1], p.z - l.pos[2]);
-      e += 1.1 * l.rate * Math.exp(-r / 1.6); ta += 2.0 * l.rate * Math.exp(-r / 1.4); va += 0.15 * l.rate * Math.exp(-r / 1.2); }
+      ta += 2.6 * boilK(b.id) * Math.exp(-rr / 2.2); }
+    for (const l of LEAKS) { const lr = leakRate[l.id] ?? l.rate, r = Math.hypot(p.x - l.pos[0], p.y - l.pos[1], p.z - l.pos[2]);
+      e += 1.1 * lr * Math.exp(-r / 1.6); ta += 2.0 * lr * Math.exp(-r / 1.4); va += 0.15 * lr * Math.exp(-r / 1.2); }
     e = Math.min(e, 0.92 * es(ta));
     return { ta, e, va, rh: Math.min(1, e / es(ta)) };
   }
@@ -154,10 +160,13 @@ export function createHeatField() {
     doors, on, at, radiant, air, globeEq, wetBulb, naturalWet,
     setDoor(id, open) { if (id in doors) doors[id] = Math.max(0, Math.min(1, +open)); },
     setOven(id, b) { if (id in on) on[id] = !!b; },
-    sp, pv,
+    sp, pv, boil, leakRate,
+    setBoiler(id, { on, load } = {}) { const b = boil[id]; if (!b) return; if (on != null) b.on = !!on; if (load != null) b.load = Math.max(0, Math.min(1, load)); },
+    setLeak(id, rate) { if (id in leakRate) leakRate[id] = Math.max(0, Math.min(1, rate)); },
     setSetpoint(id, v) { if (id in sp) sp[id] = Math.max(0, Math.min(300, Math.round(v))); },
-    /** avança a temperatura real das câmaras dt segundos simulados */
+    /** avança a temperatura real das câmaras (fornos) e o fator térmico das caldeiras dt segundos simulados */
     stepOvens(dt) {
+      for (const b of Object.values(boil)) { const tgt = b.on ? 0.55 + 0.6 * b.load : 0.12; b.heat += (tgt - b.heat) * (1 - Math.exp(-dt / 480)); }
       for (const o of OVENS) { const id = o.id, tgt = on[id] ? sp[id] : AMB.wallT;
         const r = tgt > pv[id] ? 8 / 60 : 3 / 60; const d = tgt - pv[id];
         pv[id] += Math.sign(d) * Math.min(Math.abs(d), r * dt * (Math.abs(d) < 6 ? Math.max(0.25, Math.abs(d) / 6) : 1));
