@@ -9,6 +9,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HALL, OVENS, ovenFrontZ } from './layout.js';
 import { HALL as HC } from './layout_cams.js';
 import * as TX from './hall_tex.js';
+// ruído de valor (GLSL) para sujeira/variação procedural em espaço de mundo — quebra a repetição das texturas tileáveis
+const GLN = '\nfloat gHn(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\nfloat gVn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHn(i), gHn(i + vec2(1.0, 0.0)), f.x), mix(gHn(i + vec2(0.0, 1.0)), gHn(i + 1.0), f.x), f.y); }\n';
 
 const V3 = THREE.Vector3;
 const W = HALL.x1 - HALL.x0, D = HALL.z1 - HALL.z0, HT = HALL.h, TT = HC.tileTop; // 2,10 m = 7 fiadas de 30 cm
@@ -43,6 +45,29 @@ export function buildHall(stage, app) {
   // (≈65% da luminância das paredes, como na FOTO 5) — o IBL de um ponto só e as luzes voltadas para baixo não o iluminam
   M.ceil = new THREE.MeshStandardMaterial({ map: ceil.map, roughnessMap: ceil.rough, normalMap: ceil.normal, roughness: 1, envMapIntensity: 1.0, color: 0xf2f2ef,
     emissive: new THREE.Color(1.0, 0.975, 0.94), emissiveMap: ceil.map, emissiveIntensity: 0.3, normalScale: new THREE.Vector2(0.6, 0.6) });
+  // azulejo: tom por peça (lotes de queima), respingo/encardido na faixa baixa e escorridos verticais de vapor/gordura
+  M.tile.onBeforeCompile = (s) => {
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + GLN)
+      .replace('#include <map_fragment>', '#include <map_fragment>\n { vec2 wu = vMapUv * ' + tile.size.toFixed(3) + '; vec2 ti = floor(wu / 0.3 + 0.001); float h1 = gHn(ti), h2 = gHn(ti + 9.1);'
+        + ' float sp = (1.0 - smoothstep(0.0, 0.42, wu.y)) * (0.55 + 0.45 * gVn(wu * vec2(5.0, 9.0)));'
+        + ' float st = smoothstep(0.58, 0.9, gVn(vec2(wu.x * 7.0, wu.y * 0.45))) * smoothstep(0.2, 1.4, wu.y);'
+        + ' vec3 k = vec3(0.975 + 0.035 * h1) * vec3(1.0, 1.0 - 0.01 * h2, 1.0 - 0.02 * h2);'
+        + ' k *= mix(vec3(1.0), vec3(0.8, 0.77, 0.71), sp * 0.55); k *= mix(vec3(1.0), vec3(0.9, 0.87, 0.8), st * 0.4);'
+        + ' k *= 0.965 + 0.05 * gVn(wu * 1.3); diffuseColor.rgb *= k; }');
+  };
+  M.tile.customProgramCacheKey = () => 'hallTile';
+  // forro: placas de lotes/idades diferentes, algumas com mancha d'água (infiltração) e véu de gordura/fuligem difuso
+  M.ceil.onBeforeCompile = (s) => {
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + GLN + 'vec3 gCeilK;\n')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n { vec2 wu = vMapUv * ' + ceil.size.toFixed(3) + '; vec2 pi = floor(wu / 0.625 + 0.001), pf = fract(wu / 0.625 + 0.001); float h1 = gHn(pi), h2 = gHn(pi + 5.7), h3 = gHn(pi + 23.1);'
+        + ' vec3 k = vec3(0.95 + 0.07 * h1) * vec3(1.0, 1.0 - 0.012 * h2, 1.0 - 0.03 * h2);'
+        + ' if (h3 > 0.93) { vec2 c = vec2(0.3 + 0.4 * gHn(pi + 2.0), 0.3 + 0.4 * gHn(pi + 3.0)); float r = 0.18 + 0.2 * gHn(pi + 4.0);'
+        + '   float d = length(pf - c) * (0.85 + 0.3 * gVn(pf * 9.0 + pi)); float inside = 1.0 - smoothstep(r - 0.06, r, d); float ring = smoothstep(r - 0.05, r - 0.01, d) * inside;'
+        + '   k *= mix(vec3(1.0), vec3(0.92, 0.87, 0.76), inside * 0.35 + ring * 0.4); }'
+        + ' k *= 0.94 + 0.07 * gVn(wu * 0.8); gCeilK = k; diffuseColor.rgb *= k; }')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= gCeilK;');
+  };
+  M.ceil.customProgramCacheKey = () => 'hallCeil';
   M.cove = new THREE.MeshStandardMaterial({ color: 0x9a9993, roughness: 0.45 });
   M.inox = new THREE.MeshStandardMaterial({ color: 0xd2d5d8, metalness: 1, roughness: 0.95, roughnessMap: brushed });
   M.inoxDark = new THREE.MeshStandardMaterial({ color: 0xa4a8ac, metalness: 1, roughness: 1.0, roughnessMap: brushed });
@@ -116,9 +141,11 @@ export function buildHall(stage, app) {
       s.uniforms.macroMap = { value: macro.map }; s.uniforms.macroRough = { value: macro.rough }; s.uniforms.macroBox = { value: new THREE.Vector4(HALL.x0, HALL.z0, W, D) };
       s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec2 vMac; uniform vec4 macroBox;')
         .replace('#include <fog_vertex>', '#include <fog_vertex>\n{ vec4 wpM = modelMatrix * vec4(transformed, 1.0); vMac = (wpM.xz - macroBox.xy) / macroBox.zw; }');
-      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vMac; uniform sampler2D macroMap; uniform sampler2D macroRough;')
-        .replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= texture2D(macroMap, vMac).rgb * 2.0;')
-        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * texture2D(macroRough, vMac).r * 2.0, 0.05, 1.0);');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec2 vMac; uniform vec4 macroBox; uniform sampler2D macroMap; uniform sampler2D macroRough;' + GLN)
+        .replace('#include <map_fragment>', '#include <map_fragment>\n { vec3 mc = 1.0 + (texture2D(macroMap, vMac).rgb * 2.0 - 1.0) * 1.8; vec2 wq = vMac * macroBox.zw + macroBox.xy; vec2 ti = floor(wq / 0.4 + 0.001);'
+          + ' float h1 = gHn(ti), h2 = gHn(ti + 17.3); float nb = gVn(wq * 0.9) * 0.6 + gVn(wq * 3.1) * 0.4;'
+          + ' diffuseColor.rgb *= mc * (0.955 + 0.07 * h1) * vec3(1.0 + (h2 - 0.5) * 0.025, 1.0, 1.0 - (h2 - 0.5) * 0.035) * (0.95 + 0.07 * nb); }')
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * (1.0 + (texture2D(macroRough, vMac).r * 2.0 - 1.0) * 1.5) * (0.9 + 0.2 * gVn(vMac * vec2(41.0, 30.0))), 0.05, 1.0);');
     };
     const floor = new THREE.Mesh(g, M.floor); floor.receiveShadow = true; floor.name = 'floor'; group.add(floor);
     // canaletas
@@ -138,7 +165,11 @@ export function buildHall(stage, app) {
   // ───────── paredes: azulejo até 2,10 m + pintura (cores por vértice = encardido junto ao piso e manchas de calor) ─────────
   function grime(x, y, z, part) {
     let k = 1;
-    if (part === 'tile') k *= 0.93 + 0.07 * Math.min(1, y / 0.35);
+    if (part === 'tile') { k *= 0.93 + 0.07 * Math.min(1, y / 0.35);
+    // gordura/calor junto aos fornos (azulejo amarelado/acinzentado ao redor e acima das bocas)
+    for (const o of OVENS) { const ex = Math.max(0, Math.abs(x - o.x) - o.w / 2), ez = Math.max(0, z - (HALL.z0 + o.d)); const d = Math.hypot(ex, ez);
+      if (d < 0.9) k *= 1 - 0.1 * (1 - d / 0.9) * Math.min(1, Math.max(0, (y - 0.6) / 1.4)); }
+    }
     else {
       // manchas de calor/gordura acima dos fornos (pintura amarelada/acinzentada junto ao forro)
       for (const o of OVENS) if (z < HALL.z0 + 0.05) { const dx = Math.abs(x - o.x) / (o.w * 0.7); if (dx < 1) k *= 1 - 0.07 * (1 - dx * dx) * Math.min(1, Math.max(0, (y - 2.4) / 1.2)); }

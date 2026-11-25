@@ -171,7 +171,7 @@ export function floorMacro() {
   for (let k = 0; k < 1100; k++) {
     const px = r() * N, py = r() * M, rr = S(0.4 + r() * 2.2), dk = r() < 0.5;
     const g = x.createRadialGradient(px, py, 0, px, py, rr);
-    g.addColorStop(0, dk ? `rgba(52,50,44,${0.07 + r() * 0.12})` : `rgba(190,192,186,${0.05 + r() * 0.07})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+    g.addColorStop(0, dk ? `rgba(52,50,44,${0.1 + r() * 0.16})` : `rgba(190,192,186,${0.06 + r() * 0.09})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = g; x.fillRect(px - rr, py - rr, rr * 2, rr * 2);
   }
   // zonas de equipamento: epóxi verde (como FOTO 5) sob as caldeiras e o trocador, com borda
@@ -182,7 +182,8 @@ export function floorMacro() {
   for (const b of BOILERS.filter((b) => b.kind === 'flamotubular')) zone(b.c[0] - 1.75, b.c[2] - b.L / 2 - 0.6, b.c[0] + 1.75, b.c[2] + b.L / 2 - 0.15);
   // faixas amarelas de demarcação (10 cm) — corredores e contornos
   const lineW = S(0.1);
-  const yline = (x0, z0, x1, z1) => {
+  const segs = [];
+  const yline = (x0, z0, x1, z1) => { segs.push([x0, z0, x1, z1]);
     x.strokeStyle = 'rgba(226,182,22,0.95)'; x.lineWidth = lineW; x.lineCap = 'butt'; x.beginPath(); x.moveTo(X(x0), Z(z0)); x.lineTo(X(x1), Z(z1)); x.stroke();
     rx.strokeStyle = 'rgb(255,70,255)'; rx.lineWidth = lineW; rx.beginPath(); rx.moveTo(X(x0), Z(z0)); rx.lineTo(X(x1), Z(z1)); rx.stroke();
   };
@@ -242,6 +243,42 @@ export function floorMacro() {
   // faixas amarelas: texto "ÁREA RESTRITA — CALDEIRAS" no piso diante das caldeiras
   x.save(); x.fillStyle = 'rgba(226,182,22,0.85)'; x.font = `900 ${S(0.32)}px Arial, sans-serif`; x.textAlign = 'center';
   x.translate(X(39.5), Z(0.15)); x.fillText('ÁREA RESTRITA', 0, 0); x.restore();
+  // ── uso real: tinta das faixas lascada/gasta (mais nos cruzamentos do corredor), rodados de empilhadeira/paleteira
+  for (const [x0, z0, x1, z1] of segs) {
+    const L = Math.hypot(x1 - x0, z1 - z0), nch = Math.round(L * 5);
+    for (let k = 0; k < nch; k++) { const t = r(), px = X(x0 + (x1 - x0) * t), pz = Z(z0 + (z1 - z0) * t), rr = S(0.03 + r() * 0.12);
+      x.fillStyle = r() < 0.7 ? `rgba(141,143,140,${0.55 + r() * 0.4})` : `rgba(70,66,56,${0.25 + r() * 0.3})`;
+      x.beginPath(); x.ellipse(px, pz, rr, rr * (0.4 + r() * 0.6), r() * 3, 0, 7); x.fill(); }
+  }
+  x.lineCap = 'round';
+  for (let k = 0; k < 26; k++) { // pares de rodados (pneu), escuros, cruzando o corredor e indo às caldeiras
+    const x0 = X(31.5 + r() * 21), z0 = Z(-1.5 + r() * 9), L = S(3 + r() * 8), a = (r() < 0.6 ? 0 : Math.PI / 2) + (r() - 0.5) * 0.4, w = S(0.9 + r() * 0.4);
+    const nx = -Math.sin(a), nz = Math.cos(a);
+    for (const o of [0, w]) { x.strokeStyle = `rgba(34,32,28,${0.06 + r() * 0.07})`; x.lineWidth = S(0.1 + r() * 0.08); x.beginPath(); x.moveTo(x0 + nx * o, z0 + nz * o); x.quadraticCurveTo(x0 + nx * o + Math.cos(a) * L * 0.5 + nx * S(r() - 0.5), z0 + nz * o + Math.sin(a) * L * 0.5 + nz * S(r() - 0.5), x0 + nx * o + Math.cos(a) * L, z0 + nz * o + Math.sin(a) * L); x.stroke(); }
+  }
+  // corredor polido pelo tráfego (mais escuro/liso no meio) + emendas/remendos de concreto
+  { const g = x.createLinearGradient(0, Z(0.55), 0, Z(4.1)); g.addColorStop(0, 'rgba(60,58,52,0)'); g.addColorStop(0.5, 'rgba(60,58,52,0.13)'); g.addColorStop(1, 'rgba(60,58,52,0)'); x.fillStyle = g; x.fillRect(X(30.2), Z(0.55), S(25.6), S(3.55));
+    rx.fillStyle = 'rgba(255,72,255,0.6)'; rx.fillRect(X(30.2), Z(1.3), S(25.6), S(2.1)); }
+  for (let k = 0; k < 9; k++) { const px = X(31 + r() * 23), pz = Z(-8 + r() * 15), w = S(0.4 + r() * 1.2), h = S(0.3 + r() * 0.9); x.fillStyle = `rgba(${r() < 0.5 ? '120,118,108' : '158,156,148'},0.45)`; x.save(); x.translate(px, pz); x.rotate((r() - 0.5) * 0.2); x.fillRect(-w / 2, -h / 2, w, h); x.strokeStyle = 'rgba(40,38,34,0.35)'; x.lineWidth = 2; x.strokeRect(-w / 2, -h / 2, w, h); x.restore(); }
+  // fissuras finas de retração
+  x.strokeStyle = 'rgba(38,36,32,0.42)'; x.lineWidth = 1.4;
+  for (let k = 0; k < 40; k++) { let px = X(30.5 + r() * 25), pz = Z(-9.5 + r() * 19); x.beginPath(); x.moveTo(px, pz); const a0 = r() * 6.3; for (let j = 0; j < 7; j++) { const a = a0 + (r() - 0.5) * 1.2; px += Math.cos(a) * S(0.08 + r() * 0.15); pz += Math.sin(a) * S(0.08 + r() * 0.15); x.lineTo(px, pz); } x.stroke(); }
+  // ── oclusão de contato (sombra suave) sob o que toca o piso: caldeiras, vasos, armários, bombas, sala de controle, mesa, carrinho
+  x.save(); x.filter = `blur(${Math.round(S(0.18))}px)`;
+  const ao = (x0, z0, x1, z1, a) => { x.fillStyle = `rgba(18,17,15,${a})`; x.fillRect(X(x0), Z(z0), S(x1 - x0), S(z1 - z0)); };
+  const aoC = (cx, cz, rad, a) => { x.fillStyle = `rgba(18,17,15,${a})`; x.beginPath(); x.arc(X(cx), Z(cz), S(rad), 0, 7); x.fill(); };
+  for (const b of BOILERS) {
+    if (b.kind === 'flamotubular') { ao(b.c[0] - 1.0, b.c[2] - b.L / 2 + 0.2, b.c[0] + 1.0, b.c[2] + b.L / 2 - 0.2, 0.22); for (const dz of [-2.05, 1.75]) ao(b.c[0] - 1.15, b.c[2] + dz - 0.3, b.c[0] + 1.15, b.c[2] + dz + 0.3, 0.42); }
+    else if (b.axis === 'x') { ao(b.c[0] - b.L / 2, b.c[2] - b.R * 0.8, b.c[0] + b.L / 2, b.c[2] + b.R * 0.8, 0.2); for (const s of [-1, 1]) ao(b.c[0] + s * (b.L / 2 - 0.55) - 0.2, b.c[2] - b.R, b.c[0] + s * (b.L / 2 - 0.55) + 0.2, b.c[2] + b.R, 0.35); }
+    else aoC(b.c[0], b.c[2], b.R * 1.05, 0.3);
+  }
+  ao(30.2, -9.05, 30.9, -5.25, 0.45); // CCM
+  ao(C.x0 - 0.05, C.z0 - 0.05, C.x1 + 0.05, C.z0 + 0.12, 0.4); ao(C.x0 - 0.05, C.z0, C.x0 + 0.12, C.z1, 0.4);
+  for (const [px, pz] of [[51.7, -4.0], [53.5, -4.0]]) ao(px - 0.55, pz - 0.3, px + 0.55, pz + 0.3, 0.35);
+  for (const [px, pz, rr] of [[31.0, 6.3, 0.3], [31.75, 6.3, 0.3], [32.8, 6.3, 0.42], [39.6, -7.2, 0.45]]) aoC(px, pz, rr, 0.4);
+  ao(37.25, 0.05, 38.05, 0.55, 0.38); ao(31.2, 8.1, 32.4, 9.1, 0.3); // carrinho, palete de sal
+  aoC(41.8, 5.6, 0.75, 0.16); // mesa
+  x.restore();
   const map = tex(c, { srgb: true, rep: false }), rough = tex(rc, { rep: false });
   return { map, rough };
 }
@@ -277,12 +314,14 @@ export function outsideTexture(seed = 3) {
   const W = 1024, H = 512, [c, x] = cnv(W, H), r = rng(seed);
   const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#f4f7fa'); g.addColorStop(0.55, '#e9eef2'); g.addColorStop(1, '#d9dfe2'); x.fillStyle = g; x.fillRect(0, 0, W, H);
   // silhuetas desbotadas: galpão vizinho, árvores, postes (contraluz na névoa clara)
-  x.fillStyle = 'rgba(170,180,186,0.45)';
+  x.filter = 'blur(7px)'; // visto através do vidro sujo: nada de contorno nítido
+  x.fillStyle = 'rgba(176,184,190,0.32)';
   for (let k = 0; k < 6; k++) { const bx = r() * W, bw = 120 + r() * 300, bh = 60 + r() * 120; x.fillRect(bx, H * 0.78 - bh, bw, bh + H); }
   // copas de árvores muito desbotadas (contraluz), em faixa irregular
   x.fillStyle = 'rgba(176,186,178,0.22)';
   for (let k = 0; k < 160; k++) { const tx = r() * W, ty = H * (0.66 + r() * 0.1) + Math.sin(tx * 0.01) * 12, tr = 6 + r() * 16; x.beginPath(); x.arc(tx, ty, tr, 0, 7); x.fill(); }
   x.fillStyle = 'rgba(140,150,156,0.35)'; for (let k = 0; k < 4; k++) { const px = r() * W; x.fillRect(px, H * 0.3, 4, H); }
+  x.filter = 'none';
   const t = tex(c, { srgb: true, rep: true }); t.wrapT = THREE.ClampToEdgeWrapping; return t;
 }
 
@@ -291,6 +330,36 @@ export function glassGrime() {
   const N = 256, n = fbm(N, N, 4, 4, 5, 101), [c, x] = cnv(N), img = x.createImageData(N, N);
   for (let i = 0; i < N * N; i++) { const y = (i / N) | 0; const v = 0.12 + n[i] * 0.25 + (y / N) * 0.12; img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v * 255; img.data[i * 4 + 3] = 255; }
   x.putImageData(img, 0, 0); return tex(c);
+}
+// vidro por vão com caixilho cols × rows: cada vidro com sujeira própria, poeira acumulada embaixo, escorridos sob as
+// travessas, alguns vidros trocados por policarbonato leitoso/amarelado. Saída: map (sRGB, cor da sujeira) + alpha (G).
+const _panes = {};
+export function glassPanes(cols, rows = 4, seed = 5) {
+  const key = cols + 'x' + rows; if (_panes[key]) return _panes[key];
+  const N = 512, n = fbm(N, N, 8, 8, 5, 101 + seed), r = rng(900 + cols * 7 + seed);
+  const [c, x] = cnv(N), img = x.createImageData(N, N);
+  const pane = []; for (let k = 0; k < cols * rows; k++) { const q = r(); pane.push({ a: 0.3 + r() * 0.28, poly: q < 0.13 ? 1 : q < 0.2 ? 2 : 0, tint: r() }); }
+  const streak = new Float32Array(N); for (let i = 0; i < N; i++) streak[i] = r() < 0.06 ? 0.3 + r() * 0.5 : 0;
+  for (let i = 1; i < N; i++) streak[i] = Math.max(streak[i], streak[i - 1] * 0.55);
+  for (let y = 0; y < N; y++) for (let xx = 0; xx < N; xx++) {
+    const i = y * N + xx, u = xx / N * cols, v = (1 - y / N) * rows; // v = 0 embaixo
+    const ci = Math.min(cols - 1, u | 0), ri = Math.min(rows - 1, v | 0), fu = u - ci, fv = v - ri, p = pane[ri * cols + ci];
+    const edge = Math.min(fu, 1 - fu, fv * 0.6, 1 - fv) ; // poeira nos cantos (mais embaixo)
+    let a = p.a + (n[i] - 0.5) * 0.35 + sst(0.12, 0.0, edge) * 0.35 + sst(0.35, 0.0, fv) * 0.18 + streak[xx] * sst(0.4, 1.0, fv) * 0.4;
+    let R = 0.6, Gc = 0.59, B = 0.55; // fuligem/poeira bege-acinzentada
+    if (p.poly === 1) { a = 0.82 + (n[i] - 0.5) * 0.1; R = 0.9; Gc = 0.91; B = 0.9; }
+    else if (p.poly === 2) { a = 0.78 + (n[i] - 0.5) * 0.1; R = 0.88; Gc = 0.84; B = 0.68; }
+    else { const t = p.tint * 0.08; R += t; Gc += t; B += t * 0.8; }
+    a = clamp01(a);
+    img.data[i * 4] = R * 255; img.data[i * 4 + 1] = Gc * 255; img.data[i * 4 + 2] = B * 255; img.data[i * 4 + 3] = 255;
+    if (!_panes.tmp) _panes.tmp = {}; (_panes.tmp[key] ||= new Uint8ClampedArray(N * N))[i] = a * 255;
+  }
+  x.putImageData(img, 0, 0);
+  const [ac, ax] = cnv(N), aimg = ax.createImageData(N, N), A = _panes.tmp[key];
+  for (let i = 0; i < N * N; i++) { aimg.data[i * 4] = aimg.data[i * 4 + 1] = aimg.data[i * 4 + 2] = A[i]; aimg.data[i * 4 + 3] = 255; }
+  ax.putImageData(aimg, 0, 0); delete _panes.tmp[key];
+  _panes[key] = { map: tex(c, { srgb: true, rep: false }), alpha: tex(ac, { rep: false }) };
+  return _panes[key];
 }
 
 // ───────────── manômetro (mostrador branco, escala 0–16 kgf/cm², faixa vermelha acima da PMTA) ─────────────

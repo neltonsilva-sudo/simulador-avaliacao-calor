@@ -129,23 +129,23 @@ function leatherMat() {
         mix(mix(h31(i+vec3(0,0,1)),h31(i+vec3(1,0,1)),f.x),mix(h31(i+vec3(0,1,1)),h31(i+vec3(1,1,1)),f.x),f.y),f.z);}
       float bScuff; float bSeam;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-      { vec3 p = vB; vec3 col = uBootCol * (0.85 + 0.3 * vn(p * 900.0));
+      { vec3 p = vB; vec3 col = uBootCol * (0.85 + 0.3 * vn(p * 900.0)); float wb = step(0.2, uBootCol.r); // botina clara (forneira)
         // biqueiro: costura em arco atravessando o bico (pesponto duplo)
         float cap = p.z - (0.118 + 0.035 * pow(abs(p.x) / 0.055, 2.0));
         float st = smoothstep(0.0011, 0.0003, abs(cap)) + smoothstep(0.0011, 0.0003, abs(cap - 0.0045));
         float dots = step(0.45, fract((p.x + p.y * 0.3) * 520.0));
         bSeam = clamp(st, 0.0, 1.0) * step(p.y, 0.09);
-        col = mix(col, vec3(0.07, 0.065, 0.06), bSeam * dots);
+        col = mix(col, mix(vec3(0.07, 0.065, 0.06), uBootCol * 0.72, wb), bSeam * dots);
         col *= mix(1.0, 0.78, smoothstep(0.003, 0.0, abs(cap - 0.0022)) * step(p.y, 0.09));
         // lingueta (camurça um tom acima) entre as linhas de ilhós
         float tg = step(abs(p.x), 0.012) * step(0.035, p.y + p.z * 0.6) * step(p.z, 0.098);
-        col = mix(col, vec3(0.035, 0.032, 0.03) * (0.8 + 0.4 * vn(p * 1400.0)), tg * 0.9);
+        col = mix(col, mix(vec3(0.035, 0.032, 0.03), uBootCol * 0.93, wb) * (0.8 + 0.4 * vn(p * 1400.0)), tg * 0.9);
         // desgaste: bico e calcanhar esfolados, poeira perto da sola
         float sc = smoothstep(0.15, 0.19, p.z) * smoothstep(0.075, 0.035, p.y) + smoothstep(-0.05, -0.068, p.z) * smoothstep(0.08, 0.04, p.y) * 0.7;
         sc *= smoothstep(0.35, 0.75, vn(p * 160.0) * 0.7 + vn(p * 700.0) * 0.3);
-        bScuff = sc; col = mix(col, vec3(0.05, 0.046, 0.042), sc * 0.8);
+        bScuff = sc; col = mix(col, mix(vec3(0.05, 0.046, 0.042), uBootCol * vec3(0.78, 0.75, 0.7), wb), sc * mix(0.8, 0.5, wb));   // no branco: encardido, não pintas pretas
         float du = smoothstep(0.065, 0.03, p.y) * (0.4 + 0.6 * vn(p * 220.0));
-        col = mix(col, vec3(0.12, 0.11, 0.095), du * 0.22);
+        col = mix(col, mix(vec3(0.12, 0.11, 0.095), vec3(0.42, 0.39, 0.34), wb), du * 0.22);
         // vinco de flexão no peito do pé
         diffuseColor.rgb = col; }`)
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = clamp(0.42 + 0.16 * vn(vB * 300.0) + 0.3 * bScuff + 0.15 * smoothstep(0.065, 0.03, vB.y), 0.0, 1.0);')

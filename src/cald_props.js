@@ -233,4 +233,30 @@ export function buildProps(ctx) {
     ctx.pipe('rubber', [V(44.62, 0.03, -6.6), V(44.62, 0.03, -7.9), V(44.4, 0.3, -8.25)], 0.022, 0.2);
     for (let k = 0; k < 4; k++) batch.add('wheelRed', G.cached('hoseR' + k, () => new THREE.TorusGeometry(0.22 + k * 0.03, 0.02, 8, 36)), G.mat4([30.18, 1.6, -1.2], [0, Math.PI / 2, 0]));
   }
+
+  // ═════════════ RACK AÉREO TRANSVERSAL (z ≈ 4,6): utilidades + eletrocalha em trapézios pendurados nas tesouras ═════════════
+  {
+    const yb = 6.4, xa = 30.0, xb = 56.0, TY = ctx.TRUSS_Y; // z dentro do pilarete (4,65–5,35): entra na alvenaria, não no vidro
+    const lines = [[4.76, 0.1, 'clad'], [4.99, 0.065, 'steel'], [5.15, 0.045, 'paintGreen'], [5.28, 0.035, 'paintBlue']];
+    for (const [z, r, k] of lines) ctx.pipe(k, [V(xa, yb + 0.04 + r, z), V(xb, yb + 0.04 + r, z)], r);
+    const hangX = [33.25, 36.5, 39.75, 43, 46.25, 49.5, 52.75];
+    for (const x of hangX) {
+      box('struct', [x, yb + 0.02, 5.0], [0.08, 0.08, 0.8]); // travessa (cantoneira)
+      box('struct', [x, 5.95, 5.0], [0.06, 0.05, 0.8]); // travessa da eletrocalha
+      for (const z of [4.62, 5.38]) cyl('steelDark', V(x, 5.92, z), V(x, TY, z), 0.009, 6);
+      for (const [z, r] of lines) batch.add('steelDark', G.cached('rkU' + r, () => new THREE.TorusGeometry(r + 0.008, 0.006, 5, 18, Math.PI)), G.mat4([x, yb + 0.04 + r, z], [0, Math.PI / 2, 0]));
+    }
+    // eletrocalha perfurada galvanizada (450 mm) com cabos
+    box('galv', [(xa + xb) / 2, 6.0, 5.0], [xb - xa, 0.008, 0.45]);
+    for (const z of [4.78, 5.22]) box('galv', [(xa + xb) / 2, 6.05, z], [xb - xa, 0.1, 0.008]);
+    for (let k = 0; k < 6; k++) cyl(k === 2 ? 'paintBlue' : 'rubber', V(xa, 6.03, 4.86 + k * 0.055), V(xb, 6.03, 4.86 + k * 0.055), 0.014 + (k % 3) * 0.004, 6);
+    // cintas do isolamento, flanges e uma válvula de bloqueio na linha de inox
+    const sG = G.strapGeo(0.1, 0.025, 0.0025, 28);
+    for (let x = xa + 0.6; x < xb - 0.3; x += 1.0) batch.add('steel', sG, G.mat4([x, yb + 0.14, 4.76], [0, 0, Math.PI / 2]));
+    for (const x of [34.9, 41.4, 47.9, 54.4]) G.flange(batch, inst, 'steel', M.nut, V(x, yb + 0.105, 4.99), V(1, 0, 0), 0.065, { bolts: 8 });
+    G.valve(batch, inst, M, V(38.1, yb + 0.105, 4.99), V(1, 0, 0), V(0, 1, 0), 0.065, { wheel: 'red', size: 0.9, gate: true });
+    // descida da linha verde (água tratada) até os abrandadores, com cotovelos
+    ctx.pipe('paintGreen', [V(31.6, yb + 0.085, 5.15), V(31.6, 3.3, 5.15), V(30.0, 3.3, 5.15)], 0.045, 0.16);
+    box('steelDark', [30.8, 4.8, 5.15], [1.6, 0.05, 0.05]); G.valve(batch, inst, M, V(31.6, 4.2, 5.15), V(0, 1, 0), V(1, 0, 0), 0.045, { wheel: 'red', size: 0.8, gate: true });
+  }
 }

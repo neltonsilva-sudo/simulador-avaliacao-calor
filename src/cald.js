@@ -63,7 +63,9 @@ function makeMaterials(stage) {
   M.levelGlass = new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.35, depthWrite: false });
   M.levelWater = new THREE.MeshStandardMaterial({ color: 0x5b7f96, emissive: 0x1b3c55, emissiveIntensity: 0.6, roughness: 0.05, transparent: true, opacity: 0.85 });
   M.flame = new THREE.MeshBasicMaterial({ map: TX.flameTexture(), color: new THREE.Color(6, 3.2, 1.2) });
-  M.glass = new THREE.MeshStandardMaterial({ color: 0xe8eef2, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.16, depthWrite: false, alphaMap: TX.glassGrime() });
+  // vidro aramado/sujo por vão: cada vidro com sujeira própria + alguns trocados por policarbonato; translúcido contra a luz (emissivo leve)
+  const glassMat = (cols) => { const gp = TX.glassPanes(cols); return new THREE.MeshStandardMaterial({ color: 0xffffff, map: gp.map, alphaMap: gp.alpha, roughness: 0.35, metalness: 0, transparent: true, opacity: 1, depthWrite: false, emissive: 0xffffff, emissiveMap: gp.map, emissiveIntensity: 0.62 }); };
+  M.glass = glassMat(6); M.glassZ = glassMat(4);
   M.cabGlass = new THREE.MeshStandardMaterial({ color: 0xdfe8ee, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.13, depthWrite: false });
   M.outside = new THREE.MeshBasicMaterial({ map: TX.outsideTexture(), color: new THREE.Color(1.45, 1.5, 1.55), fog: false });
   M.skylight = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.3, 2.35, 2.45), side: THREE.DoubleSide });
@@ -79,6 +81,13 @@ function makeMaterials(stage) {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * (0.55 + 1.2 * texture2D(tDetR, vNormalMapUv).g), 0.04, 1.0);');
   };
   M.floor.customProgramCacheKey = () => 'caldFloor';
+  // chapas de alumínio do isolamento: cada folha com tom/brilho próprio (lotes e idades diferentes), como nas fotos
+  M.clad.onBeforeCompile = (sh) => {
+    sh.fragmentShader = 'float cladH(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\n vec2 cSh = floor(vMapUv + 0.002); float cH = cladH(cSh), cH2 = cladH(cSh + 17.3);\n diffuseColor.rgb *= vec3(0.86 + 0.2 * cH) * vec3(1.0, 1.0 - 0.02 * cH2, 1.0 - 0.045 * cH2);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * (0.8 + 0.55 * cH2), 0.04, 1.0);');
+  };
+  M.clad.customProgramCacheKey = () => 'caldClad';
   return M;
 }
 
@@ -103,7 +112,7 @@ export function buildCaldeiras(stage, app) {
   shade.struct = (p) => 0.85 + 0.15 * ss(0.0, 1.0, p.y);
   ctx.batch.build(group, M, shade);
   ctx.inst.build(group);
-  group.traverse((o) => { if (o.isMesh && (o.material === M.outside || o.material === M.skylight || o.material === M.glass || o.material === M.cabGlass)) { o.castShadow = false; } });
+  group.traverse((o) => { if (o.isMesh && (o.material === M.outside || o.material === M.skylight || o.material === M.glass || o.material === M.glassZ || o.material === M.cabGlass)) { o.castShadow = false; } });
 
   // ───── luzes próprias (sem sombra) ─────
   const L = new THREE.Group(); L.name = 'cald_lights'; group.add(L);

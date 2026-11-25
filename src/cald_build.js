@@ -76,7 +76,7 @@ export function buildBuilding(ctx) {
       batch.add('concrete', sill, G.mat4(axis === 'x' ? [(a + b) / 2, WIN.y0 - 0.03, fixed + (fixed === Z0 ? 0.04 : -0.04)] : [fixed + (fixed === X0 ? 0.04 : -0.04), WIN.y0 - 0.03, (a + b) / 2]));
       // vidro (uma placa por vão) + exterior emissivo 3 m para fora
       const gw = new THREE.PlaneGeometry(b - a, fy);
-      const glass = new THREE.Mesh(gw, M.glass); glass.castShadow = false; glass.receiveShadow = false;
+      const glass = new THREE.Mesh(gw, axis === 'x' ? M.glass : M.glassZ); glass.castShadow = false; glass.receiveShadow = false;
       const out = new THREE.Mesh(new THREE.PlaneGeometry((b - a) * 2.2, fy * 2.0), M.outside); out.castShadow = false; out.receiveShadow = false;
       const mid = (a + b) / 2, ym = (WIN.y0 + WIN.y1) / 2;
       if (axis === 'x') { glass.position.set(mid, ym, fixed - (fixed === Z0 ? 0.12 : -0.12)); glass.rotation.y = fixed === Z0 ? 0 : Math.PI; out.position.set(mid, ym + 0.6, fixed + (fixed === Z0 ? -3.5 : 3.5)); out.rotation.y = fixed === Z0 ? 0 : Math.PI; }

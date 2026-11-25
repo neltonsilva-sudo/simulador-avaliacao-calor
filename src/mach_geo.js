@@ -199,6 +199,24 @@ function emissiveFromColor(mat) {
   mat.customProgramCacheKey = () => 'emisVC';
   return mat;
 }
+// uso em espaço de mundo no inox: encardido/respingo de rodo no rodapé (0–0,5 m), véu de calor/fumaça amarronzado e
+// estriado no terço superior (vapor que sai das portas) e manchas largas de pano — quebra o "inox de catálogo"
+const GLN = '\nvarying vec3 vWpG;\nfloat gHn(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }\nfloat gVn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(gHn(i), gHn(i + vec2(1.0, 0.0)), f.x), mix(gHn(i + vec2(0.0, 1.0)), gHn(i + 1.0), f.x), f.y); }\n';
+function steelGrime(m) {
+  m.onBeforeCompile = (s) => {
+    s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWpG;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n { vec4 wg = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\n wg = instanceMatrix * wg;\n#endif\n vWpG = (modelMatrix * wg).xyz; }');
+    s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>' + GLN + 'float gKz; float gHt;\n')
+      .replace('#include <map_fragment>', '#include <map_fragment>\n { vec3 w = vWpG; float nB = gVn(w.xz * 2.3 + vec2(w.y * 1.7, -w.y * 1.1)) * 0.6 + gVn(w.zx * 7.0 + w.y * 5.0) * 0.4;'
+        + ' float nS = gVn(vec2((w.x + w.z) * 11.0, w.y * 0.9));'
+        + ' gKz = (1.0 - smoothstep(0.04, 0.5, w.y)) * (0.55 + 0.45 * nB);'
+        + ' gHt = smoothstep(1.35, 2.3, w.y) * smoothstep(0.3, 0.85, nS) * (1.0 - smoothstep(2.7, 3.3, w.y) * 0.4);'
+        + ' vec3 k = mix(vec3(1.0), vec3(0.7, 0.67, 0.62), gKz * 0.65); k *= mix(vec3(1.0), vec3(0.82, 0.74, 0.62), gHt * 0.4);'
+        + ' k *= 0.92 + 0.12 * nB; diffuseColor.rgb *= k; }')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor *= 1.0 + 0.45 * gKz + 0.3 * gHt;');
+  };
+  m.customProgramCacheKey = () => 'steelGrime';
+}
 export function makeMaterials(envMap) {
   const st = T.steelTextures(), tr = T.treadTextures();
   const steelBase = (o = {}) => {
@@ -206,7 +224,7 @@ export function makeMaterials(envMap) {
       color: 0xc6c8ca, map: st.albedo, roughnessMap: st.rough, roughness: 1.25, metalness: 1, normalMap: st.normal, normalScale: new THREE.Vector2(0.1, 0.1),
       anisotropy: 0.8, anisotropyRotation: Math.PI / 2, envMap, envMapIntensity: 1.4, ...o,
     });
-    m.userData.worldUV = 0.6; return m;
+    m.userData.worldUV = 0.6; steelGrime(m); return m;
   };
   const M = {
     steel: steelBase(),

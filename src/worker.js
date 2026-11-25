@@ -190,7 +190,7 @@ export async function buildWorker(stage, app) {
           if (tu.y > 0.0 && tu.y < 1.0) sk *= 1.0 - 0.8 * texture2D(uTat, vec2(tu.x, tu.y)).a; }
         diffuseColor.rgb = sk;
         if (uUni > 0.5) { wSkin = 0.0; diffuseColor.rgb = uSleeve * (0.9 + 0.15 * vn(vRest * 2.0)); } } // manga longa do uniforme por cima
-      else if (uGlove > 0.5 && dd < 11.0 && s >= 0.9 && s < 1.12) { wMask = 1.0; vec3 kq = vRest * 9.0; float kn = vn(kq) * 0.6 + vn(kq * 3.1) * 0.4;
+      else if (uGlove > 0.5 && dd < 13.0 && s >= 0.9 && s < 1.95) { /* luva cobre mão e dedos, não só o pulso */ wMask = 1.0; vec3 kq = vRest * 9.0; float kn = vn(kq) * 0.6 + vn(kq * 3.1) * 0.4;
         diffuseColor.rgb = uGloveCol * (0.78 + 0.4 * kn) * mix(0.8, 1.0, smoothstep(0.9, 0.93, s)); }
       else if (dd < 11.0 && s >= 0.955 && s < 1.12) { wSkin = 1.0; }
       if (wSkin < 0.5 && wMask < 0.5 && dot(diffuseColor.rgb, vec3(0.333)) > 0.5) {   // crepe branco: microfranzido + leve variação
@@ -528,7 +528,7 @@ export async function buildWorker(stage, app) {
   // luvas: térmica (forneira, A1) = manopla acolchoada azul-acinzentada de punho longo; vaqueta (caldeiras) = punho de couro
   const quilt = canvasTex(64, 64, (g) => { g.fillStyle = '#888'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#333'; g.lineWidth = 3; for (let k = -64; k < 128; k += 16) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 64, 64); g.moveTo(k + 64, 0); g.lineTo(k, 64); g.stroke(); } }, [3, 3]);
   const thermM = new THREE.MeshPhysicalMaterial({ color: 0x4d6280, roughness: 0.95, sheen: 0.6, sheenColor: new THREE.Color(0x9fb4d0), bumpMap: quilt, bumpScale: 2.5 });
-  const leathM = new THREE.MeshPhysicalMaterial({ color: 0x8a5a2c, roughness: 0.72, sheen: 0.3, sheenColor: new THREE.Color(0xd8b080) });
+  const leathM = new THREE.MeshPhysicalMaterial({ color: 0x956232, roughness: 0.82, sheen: 0.15, sheenColor: new THREE.Color(0xb89068), bumpMap: canvasTex(64, 64, (g) => { for (let y = 0; y < 64; y++) for (let x = 0; x < 64; x++) { const v = 128 + 70 * (Math.random() - 0.5); g.fillStyle = `rgb(${v | 0},${v | 0},${v | 0})`; g.fillRect(x, y, 1, 1); } }, [4, 4]), bumpScale: 0.6 });   // grão do couro
   const gloves = { 1: [], 2: [] };
   for (const sd of ['L', 'R']) {
     // eixo da luva = antebraço → mão (sempre aponta para os dedos; o vetor mão → Finger2 saía invertido na mão esquerda)
@@ -553,7 +553,8 @@ export async function buildWorker(stage, app) {
         const m = new THREE.Mesh(geo, thermM); m.quaternion.copy(qA); m.position.copy(w).addScaledVector(dA, off); m.castShadow = true;
         stage.scene.add(m); m.updateMatrixWorld(true); B[sd + '_Forearm'].attach(m); parts.push(m); } }
     gloves[1].push(...parts); void tg;
-    gloves[2].push(mk(new THREE.CylinderGeometry(0.047, 0.042, 0.075, 20, 1, true).rotateZ(Math.PI / 2), leathM, w.clone().addScaledVector(dF, -0.035)));
+    gloves[2].push(mk(new THREE.CylinderGeometry(0.05, 0.04, 0.075, 20, 3, true).rotateZ(Math.PI / 2), leathM, w.clone().addScaledVector(dF, -0.035)),   // cano evasê
+      mk(new THREE.TorusGeometry(0.05, 0.004, 6, 24).rotateY(Math.PI / 2), leathM, w.clone().addScaledVector(dF, -0.072)));   // bainha dobrada
   }
   [...gloves[1], ...gloves[2]].forEach((m) => { m.material.side = THREE.DoubleSide; m.visible = false; });
 
@@ -799,7 +800,7 @@ export async function buildWorker(stage, app) {
       }
     } else {
       if (a === 'A1' && L.st === 'caldeira' && !moving && L.pos.distanceTo(new THREE.Vector2(35.1, -0.72)) < 0.3) {
-        const tap = Math.max(0, Math.sin(T * 2.6)) ** 6; const dP = PANEL.clone().sub(V3(L.pos.x, 1.35, L.pos.y)).normalize(); P.hR = PANEL.clone().add(V3(0.04 * Math.sin(T * 0.7), 0.05 * Math.sin(T * 0.45), 0)).addScaledVector(dP, -0.15 - 0.02 * (1 - tap)); P.gripR = 0.35; P.fdirR = 'point'; P.lean = 0.1; P.look = PANEL.clone().add(V3(0, 0.03, 0));
+        const tap = Math.max(0, Math.sin(T * 2.6)) ** 6; const dP = PANEL.clone().sub(V3(L.pos.x, 1.35, L.pos.y)).normalize(); P.hR = PANEL.clone().add(V3(0.04 * Math.sin(T * 0.7), 0.05 * Math.sin(T * 0.45), 0)).addScaledVector(dP, -0.15 - 0.02 * (1 - tap)); P.gripR = 0.35; P.fdirR = 'point'; P.lean = 0.2; P.poleR = W(-0.3, -1, -0.15).normalize(); P.hR.y -= 0.03; P.look = PANEL.clone().add(V3(0, 0.03, 0));
       } else if (a === 'A1' && L.st === 'caldeira' && !moving) {
         const u = T % 16;
         if (u < 4) P.look = V3(35.42, 2.3, -1.44); else if (u < 7) P.look = V3(36.85, 3.48, -2.1);
@@ -916,7 +917,7 @@ export async function buildWorker(stage, app) {
       const handDown = elbowDown.clone().add(W(sx * 0.06, -1, 0.22 + swing * 1.4 + 0.15 * sw).normalize().multiplyScalar(0.25));
       const target = S[wk] > 0.01 && S[key] ? handDown.clone().lerp(S[key], S[wk]) : handDown;
       if (sw > 0.5 && !tgt) target.copy(BP(sx * 0.15, L.hipSeat + 0.1, 0.25));
-      ik(sd, target, ((L.mode === 'seated' || L.mode === 'seatedPause') && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
+      ik(sd, target, P['pole' + sd] || ((L.mode === 'seated' || L.mode === 'seatedPause') && P.book ? W(sx * 0.35, -1, 0.05) : W(sx * 0.75, -0.55, -0.45)).normalize());
       if (fdir === 'point' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], PANEL, 0.85);
       if (fdir === 'down' && S[wk] > 0.5) aim(B[sd + '_Hand'], B[sd + '_Finger2'], wpos(B[sd + '_Hand']).add(W(0, -0.55, 1).normalize()), 0.7);
       if (fdir === 'in' && S[wk] > 0.5 && S.hL && S.hR) aim(B[sd + '_Hand'], B[sd + '_Finger2'], S.hL.clone().add(S.hR).multiplyScalar(0.5).add(V3(0, -0.02, 0)).addScaledVector(fwd, 0.06), 0.55);
@@ -930,7 +931,7 @@ export async function buildWorker(stage, app) {
     book.visible = !!P.book && !!P.bookPos; if (book.visible) { book.position.copy(P.bookPos).setY(SEAT.controle + 0.2575); book.rotation.set(0, L.head + Math.PI, 0); }
     dough.visible = !!P.dough && envCur !== 'caldeiras'; if (dough.visible) { const sq = 0.5 + 0.5 * Math.abs(Math.sin(L.actT * 2.5)); dough.position.copy(BP(0, 0.9 + 0.03, 0.44)); dough.scale.set(1 + 0.25 * sq, 0.55 - 0.12 * sq, 1.1 + 0.2 * sq); }
     gloves[1].forEach((m) => (m.visible = P.glove === 1)); gloves[2].forEach((m) => (m.visible = P.glove === 2));
-    armU.uGlove.value = P.glove ? 1 : 0; armU.uGloveCol.value.set(...(P.glove === 2 ? [0.42, 0.27, 0.13] : [0.42, 0.42, 0.4]));
+    armU.uGlove.value = P.glove ? 1 : 0; armU.uGloveCol.value.set(...(P.glove === 2 ? [0.3, 0.155, 0.06] : [0.42, 0.42, 0.4]));
     // piscar
     S.blinkT -= dt; if (S.blinkT < 0) { S.blink = 0.14; S.blinkT = 2.5 + Math.random() * 3.5; }
     if (S.blink > 0) { S.blink -= dt; const k = Math.sin(Math.max(0, S.blink) / 0.14 * Math.PI);

@@ -30,7 +30,7 @@ function navyAtlas(im, NAVY = [33, 48, 76], STITCH = [118, 128, 146], soft = fal
     } else if (isShirt(r, gg, b)) k = Math.max(0.35, Math.min(1.18, 0.95 + (L - 150) / 230));
     else if (isForearm(u, v) && r > gg && gg > b) k = 0.93 + (L - 190) / 600;    // inclusive a borda do punho (sem fresta de pele)                          // manga nova: tecido liso
     if (k < 0) continue;
-    if (soft && k <= 1.6) k = 0.66 + 0.36 * k;
+    if (soft && k <= 1.6) k = 0.42 + 0.6 * k;                                   // branco: mantém o sombreado das dobras (sem giz chapado)
     if (k > 1.6) { p[i] = STITCH[0]; p[i + 1] = STITCH[1]; p[i + 2] = STITCH[2]; continue; }
     p[i] = sat(NAVY[0] * k); p[i + 1] = sat(NAVY[1] * k); p[i + 2] = sat(NAVY[2] * k);
   }
@@ -127,14 +127,15 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
     const m = sk01.boneInverses[i].clone().invert(); return new THREE.Vector3().setFromMatrixPosition(m); }; // espaço de bind já é y-cima (= vRest)
   const sh = restOf('Bip01_L_UpperArm') || new THREE.Vector3(17, 138, -6), el = restOf('Bip01_L_Forearm') || new THREE.Vector3(36, 121, -6);
   const U = { uLogo: { value: logoTex() }, uPk: { value: pk }, uSh: { value: sh }, uEl: { value: el }, uLogoOn: { value: 1 }, uTw: { value: 1 }, uGrease: { value: 0 }, uDust: { value: new THREE.Color(0.22, 0.2, 0.18) }, uDustK: { value: 0.35 } };
-  const texNavy = navyAtlas(colI), texWhite = navyAtlas(colI, [242, 241, 236], [214, 212, 204], true);
+  const texNavy = navyAtlas(colI), texWhite = navyAtlas(colI, [233, 231, 224], [206, 203, 194], true);
   const mat = inject(new THREE.MeshPhysicalMaterial({ map: texNavy, normalMap: new THREE.CanvasTexture(nrmI), normalScale: new THREE.Vector2(0.8, 0.8),
     roughnessMap: rough(spcI), roughness: 1, metalness: 0, sheen: 0.5, sheenColor: new THREE.Color(0x8a9ab8), sheenRoughness: 0.6, specularIntensity: 0.3, side: THREE.DoubleSide }), {
     decl: NOISE + `\nuniform sampler2D uLogo; uniform vec3 uPk, uSh, uEl; uniform float uLogoOn, uDustK, uTw; uniform vec3 uDust;
       float twill(vec3 p) { return p.x * 0.7 + p.y + p.z * 0.7; }
       uniform float uGrease;
-      float kneeW(vec3 q) { return q.y < 90.0 ? exp(-pow((q.y - 49.0) / 6.5, 2.0)) * step(3.0, abs(q.x)) : 0.0; }
-      float kneeA(vec3 q) { return (q.y - 49.0) * 1.9 + 1.4 * sin(q.x * 0.9 + q.z * 0.5); }
+      // vincos do joelho irregulares (2–3 dobras de intensidade e espaçamento variáveis, nada de listras repetidas)
+      float kneeW(vec3 q) { return q.y < 90.0 ? exp(-pow((q.y - 49.0) / 5.5, 2.0)) * step(3.0, abs(q.x)) * (0.25 + 0.75 * vn(vec3(q.x * 0.22, q.y * 0.06, q.z * 0.22) + 7.0)) : 0.0; }
+      float kneeA(vec3 q) { return (q.y - 49.0) * 1.15 + 3.2 * vn(vec3(q.x * 0.3, q.y * 0.12, q.z * 0.3)) + 0.9 * sin(q.x * 0.7 + q.z * 0.9); }
       float elbS(vec3 q) { vec3 pa = vec3(abs(q.x), q.y, q.z); vec3 ax = uEl - uSh; return dot(pa - uSh, ax) / dot(ax, ax); }
       float elbW(vec3 q) { vec3 pa = vec3(abs(q.x), q.y, q.z); vec3 ax = uEl - uSh; float s = elbS(q); float rr = length(pa - (uSh + ax * s));
         return (rr < 9.5 && abs(q.x) > 12.0) ? exp(-pow((s - 1.0) / 0.17, 2.0)) : 0.0; }
@@ -181,7 +182,7 @@ export async function buildUniform({ fbx, bones, mgr, inject, NOISE }) {
   fbx.add(mesh); mesh.updateMatrixWorld(true);
   mesh.bind(new THREE.Skeleton(mapped, inv), G.clone().multiply(m01.bindMatrix));
   const setEnv = (env) => { const w = env === 'fornos'; mat.map = w ? texWhite : texNavy; U.uLogoOn.value = w ? 0 : 1;
-    U.uDust.value.set(...(w ? [0.93, 0.88, 0.76] : [0.06, 0.055, 0.05])); U.uDustK.value = w ? 0.5 : 0.45; U.uGrease.value = w ? 0 : 0.55; mat.sheenColor.set(w ? 0xffffff : 0x8a9ab8); mat.needsUpdate = true; };
-  const setTwill = (k) => { U.uTw.value = k; mat.normalScale.setScalar(0.8 * (0.45 + 0.55 * k)); };
+    U.uDust.value.set(...(w ? [0.93, 0.88, 0.76] : [0.06, 0.055, 0.05])); U.uDustK.value = w ? 0.5 : 0.45; U.uGrease.value = w ? 0 : 0.55; mat.sheenColor.set(w ? 0xf4f1ea : 0x8a9ab8); mat.sheen = w ? 0.2 : 0.5; mat.needsUpdate = true; };
+  const setTwill = (k) => { U.uTw.value = k; mat.normalScale.setScalar(0.85 * (0.75 + 0.25 * k)); };   // dobras do tecido (mapa normal da F01) não somem no brim liso
   return { mesh, pants: true, sleeves: true, setEnv, setTwill };
 }
